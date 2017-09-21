@@ -4,4 +4,5 @@ version = "0.1.0"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
 
 [dependencies]
+bitflags = "1"
 libc = "0.2"

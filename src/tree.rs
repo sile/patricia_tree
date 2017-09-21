@@ -21,9 +21,24 @@ impl<V> PatriciaTree<V> {
     }
 }
 
-pub const FLAG_HAS_VALUE: u8 = 0x01;
-pub const FLAG_HAS_CHILD: u8 = 0x02;
-pub const FLAG_HAS_SIBLING: u8 = 0x04;
+bitflags! {
+    struct Flags: u8 {
+        const VALUE_ALLOCATED = 0b0000_0001;
+        const VALUE_INITIALIZED = 0b0000_0010;
+        const VALUE_EXISTS = Self::VALUE_ALLOCATED.bits
+                           | Self::VALUE_INITIALIZED.bits;
+        
+        const CHILD_ALLOCATED = 0b0000_0100;
+        const CHILD_INITIALIZED = 0b0000_1000;
+        const CHILD_EXISTS = Self::CHILD_ALLOCATED.bits
+                           | Self::CHILD_INITIALIZED.bits;
+
+        const SIBLING_ALLOCATED = 0b0001_0000;
+        const SIBLING_INITIALIZED = 0b0010_0000;
+        const SIBLING_EXISTS = Self::SIBLING_ALLOCATED.bits
+                             | Self::SIBLING_INITIALIZED.bits;
+    }
+}
 
 // layout:
 //   - flags:8
@@ -56,18 +71,18 @@ impl<V> Node<V> {
             assert!(child.is_none());
             unimplemented!("TODO");
         } else {
-            let mut flags = 0;
+            let mut flags = Flags::empty();
             let mut block_size = 1 + 1 + key_len;
             if value.is_some() {
-                flags |= FLAG_HAS_VALUE;
+                flags.insert(Flags::VALUE_EXISTS);
                 block_size += mem::size_of::<V>();
             }
             if child.is_some() {
-                flags |= FLAG_HAS_CHILD;
+                flags.insert(Flags::CHILD_EXISTS);
                 block_size += mem::size_of::<usize>();
             }
             if sibling.is_some() {
-                flags |= FLAG_HAS_SIBLING;
+                flags.insert(Flags::SIBLING_EXISTS);
                 block_size += mem::size_of::<usize>();
             }
 
@@ -76,7 +91,7 @@ impl<V> Node<V> {
 
             unsafe {
                 let mut offset = 0;
-                ptr::write(ptr.offset(offset), flags);
+                ptr::write(ptr.offset(offset), flags.bits() as u8);
                 offset += 1;
 
                 ptr::write(ptr.offset(offset), key_len as u8);
@@ -90,6 +105,7 @@ impl<V> Node<V> {
                     offset += mem::size_of::<V>() as isize;
                 }
                 if let Some(child) = child {
+                    println!("#### {}: {}", offset, child.ptr as usize);
                     ptr::write(ptr.offset(offset) as _, child.ptr);
                     offset += mem::size_of::<usize>() as isize;
                 }
@@ -111,32 +127,26 @@ impl<V> Node<V> {
             slice::from_raw_parts(self.ptr.offset(2), key_len)
         }
     }
-    pub fn child(&self) -> Option<Node<V>> {
-        self.child_offset()
-            .map(|offset| unsafe { self.ptr.offset(offset) })
-            .map(Node::from_ptr)
-    }
-    pub fn sibling(&self) -> Option<Node<V>> {
-        self.sibling_offset()
-            .map(|offset| unsafe { self.ptr.offset(offset) })
-            .map(Node::from_ptr)
-    }
-    pub fn from_ptr(ptr: *mut u8) -> Self {
+    fn from_ptr(ptr: *mut u8) -> Self {
         Node {
             ptr,
             _value: PhantomData,
         }
     }
-
-    pub fn flags(&self) -> u8 {
-        unsafe { *self.ptr }
+    fn flags(&self) -> Flags {
+        Flags::from_bits_truncate(unsafe { *self.ptr })
+    }
+    fn set_flags(&mut self, other: Flags, value: bool) {
+        let mut flags = self.flags();
+        flags.set(other, value);
+        unsafe { ptr::write(self.ptr, flags.bits() as u8) };
     }
     pub fn key_len(&self) -> u8 {
         unsafe { *self.ptr.offset(1) }
     }
-
     pub fn value_offset(&self) -> Option<isize> {
-        if (self.flags() & FLAG_HAS_VALUE) != 0 {
+        let flags = self.flags();
+        if flags.contains(Flags::VALUE_ALLOCATED) {
             Some(2 + self.key_len() as isize)
         } else {
             None
@@ -144,9 +154,9 @@ impl<V> Node<V> {
     }
     pub fn child_offset(&self) -> Option<isize> {
         let flags = self.flags();
-        if (flags & FLAG_HAS_CHILD) != 0 {
+        if flags.contains(Flags::CHILD_ALLOCATED) {
             let mut offset = 2 + self.key_len() as isize;
-            if (flags & FLAG_HAS_VALUE) != 0 {
+            if flags.contains(Flags::VALUE_ALLOCATED) {
                 offset += mem::size_of::<V>() as isize;
             }
             Some(offset)
@@ -156,12 +166,12 @@ impl<V> Node<V> {
     }
     pub fn sibling_offset(&self) -> Option<isize> {
         let flags = self.flags();
-        if (flags & FLAG_HAS_SIBLING) != 0 {
+        if flags.contains(Flags::SIBLING_ALLOCATED) {
             let mut offset = 2 + self.key_len() as isize;
-            if (flags & FLAG_HAS_VALUE) != 0 {
+            if flags.contains(Flags::VALUE_ALLOCATED) {
                 offset += mem::size_of::<V>() as isize;
             }
-            if (flags & FLAG_HAS_CHILD) != 0 {
+            if flags.contains(Flags::CHILD_ALLOCATED) {
                 offset += mem::size_of::<usize>() as isize;
             }
             Some(offset)
@@ -169,21 +179,74 @@ impl<V> Node<V> {
             None
         }
     }
-
-    pub fn set_value(&mut self, value: V) -> Option<V> {
+    pub fn take_child(&mut self) -> Option<Node<V>> {
+        if let Some(offset) = self.child_offset() {
+            if self.flags().contains(Flags::CHILD_EXISTS) {
+                println!("# {:?}, {:?}", self.value_offset(), self.child_offset());
+                println!("# BEFORE: {:?}", self.flags());
+                self.set_flags(Flags::CHILD_INITIALIZED, false);
+                println!("# AFTER: {:?}", self.flags());
+                let child = unsafe {
+                    let ptr: *mut u8 = *(self.ptr.offset(offset) as *mut _);
+                    println!("@ {}", ptr as usize);
+                    Node::from_ptr(ptr)
+                };
+                return Some(child);
+            }
+        }
+        None
+    }
+    pub fn take_sibling(&mut self) -> Option<Node<V>> {
+        if let Some(offset) = self.sibling_offset() {
+            if self.flags().contains(Flags::SIBLING_EXISTS) {
+                self.set_flags(Flags::SIBLING_INITIALIZED, false);
+                let sibling = unsafe { Node::from_ptr(self.ptr.offset(offset)) };
+                return Some(sibling);
+            }
+        }
+        None
+    }
+    pub fn take_value(&mut self) -> Option<V> {
         if let Some(offset) = self.value_offset() {
-            Some(unsafe {
-                mem::replace(mem::transmute(self.ptr.offset(offset)), value)
-            })
+            if self.flags().contains(Flags::VALUE_EXISTS) {
+                self.set_flags(Flags::VALUE_INITIALIZED, false);
+                let value = unsafe {
+                    mem::replace(
+                        mem::transmute(self.ptr.offset(offset)),
+                        mem::uninitialized(),
+                    )
+                };
+                return Some(value);
+            }
+        }
+        None
+    }
+    pub fn set_value(&mut self, value: V) -> Option<V> {
+        let old = self.take_value();
+        if let Some(offset) = self.value_offset() {
+            self.set_flags(Flags::VALUE_INITIALIZED, true);
+            unsafe { ptr::write(self.ptr.offset(offset) as _, value) };
+            old
         } else {
-            let node = Node::new(
-                self.key().iter().cloned(),
-                Some(value),
-                self.child(),
-                self.sibling(),
-            );
-            self.ptr = node.ptr;
+            let child = self.take_child();
+            let sibling = self.take_sibling();
+            let node = Node::new(self.key().iter().cloned(), Some(value), child, sibling);
+            *self = node;
             None
+        }
+    }
+
+    pub fn set_child(&mut self, child: Self) {
+        let _ = self.take_child();
+        if let Some(offset) = self.child_offset() {
+            self.set_flags(Flags::CHILD_INITIALIZED, true);
+            println!("### {}: {}", offset, child.ptr as usize);
+            unsafe { ptr::write(self.ptr.offset(offset) as _, child.ptr) };
+        } else {
+            let value = self.take_value();
+            let sibling = self.take_sibling();
+            let node = Node::new(self.key().iter().cloned(), value, Some(child), sibling);
+            *self = node;
         }
     }
 
@@ -208,8 +271,16 @@ impl<V> Node<V> {
             }
         }
 
-        if common_prefix == node_key_len && key.peek().is_none() {
-            self.set_value(value)
+        if common_prefix == node_key_len {
+            if key.peek().is_none() {
+                self.set_value(value)
+            } else if let Some(child) = self.take_child() {
+                panic!()
+            } else {
+                let child = Node::new(key, Some(value), None, None);
+                self.set_child(child);
+                None
+            }
         } else {
             panic!("{:?}", (self.key(), common_prefix))
         }
@@ -217,7 +288,12 @@ impl<V> Node<V> {
 }
 impl<V> Drop for Node<V> {
     fn drop(&mut self) {
-        unsafe { libc::free(self.ptr as *mut libc::c_void) }
+        unsafe {
+            let _ = self.take_value();
+            let _ = self.take_child();
+            let _ = self.take_sibling();
+            libc::free(self.ptr as *mut libc::c_void)
+        }
     }
 }
 
@@ -232,5 +308,7 @@ mod test {
         let mut tree = PatriciaTree::new();
         assert_eq!(tree.insert("".bytes(), 1), None);
         assert_eq!(tree.insert("".bytes(), 2), Some(1));
+
+        assert_eq!(tree.insert("foo".bytes(), 3), None);
     }
 }
