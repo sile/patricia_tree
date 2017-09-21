@@ -8,16 +8,34 @@ use libc;
 #[derive(Debug)]
 pub struct PatriciaTree<V> {
     root: Node<V>,
+    len: usize,
 }
 impl<V> PatriciaTree<V> {
     pub fn new() -> Self {
-        PatriciaTree { root: Node::root() }
+        PatriciaTree {
+            root: Node::root(),
+            len: 0,
+        }
     }
     pub fn insert<K>(&mut self, key: K, value: V) -> Option<V>
     where
         K: Iterator<Item = u8>,
     {
-        self.root.insert(key.peekable(), value)
+        if let Some(old) = self.root.insert(key.peekable(), value) {
+            Some(old)
+        } else {
+            self.len += 1;
+            None
+        }
+    }
+    pub fn get<K>(&self, key: K) -> Option<&V>
+    where
+        K: Iterator<Item = u8>,
+    {
+        self.root.get(key.peekable())
+    }
+    pub fn len(&self) -> usize {
+        self.len
     }
 }
 
@@ -181,16 +199,6 @@ impl<V> Node<V> {
             None
         }
     }
-    // TODO:
-    // pub fn child_mut(&mut self) -> Option<&mut Node<V>> {
-    //     if let Some(offset) = self.child_offset() {
-    //         if self.flags().contains(Flags::CHILD_EXISTS) {
-    //             let child: *mut Node<V> = unsafe { *(self.ptr.offset(offset) as *mut _) };
-    //             return Some(unsafe { mem::transmute(child) });
-    //         }
-    //     }
-    //     None
-    // }
     pub fn take_child(&mut self) -> Option<Node<V>> {
         if let Some(offset) = self.child_offset() {
             if self.flags().contains(Flags::CHILD_EXISTS) {
@@ -228,6 +236,33 @@ impl<V> Node<V> {
                     )
                 };
                 return Some(value);
+            }
+        }
+        None
+    }
+    pub fn value(&self) -> Option<&V> {
+        if let Some(offset) = self.value_offset() {
+            if self.flags().contains(Flags::VALUE_EXISTS) {
+                let value: *const V = unsafe { self.ptr.offset(offset) as _ };
+                return Some(unsafe { mem::transmute(value) });
+            }
+        }
+        None
+    }
+    pub fn child(&self) -> Option<&Node<V>> {
+        if let Some(offset) = self.child_offset() {
+            if self.flags().contains(Flags::CHILD_EXISTS) {
+                let child: *const Node<V> = unsafe { self.ptr.offset(offset) as _ };
+                return Some(unsafe { mem::transmute(child) });
+            }
+        }
+        None
+    }
+    pub fn sibling(&self) -> Option<&Node<V>> {
+        if let Some(offset) = self.sibling_offset() {
+            if self.flags().contains(Flags::SIBLING_EXISTS) {
+                let sibling: *const Node<V> = unsafe { self.ptr.offset(offset) as _ };
+                return Some(unsafe { mem::transmute(sibling) });
             }
         }
         None
@@ -293,7 +328,40 @@ impl<V> Node<V> {
         *self = parent;
         child
     }
+    pub fn get<K>(&self, mut key: Peekable<K>) -> Option<&V>
+    where
+        K: Iterator<Item = u8>,
+    {
+        // TODO: 共通化
+        let mut common_prefix = 0;
+        let node_key_len;
+        {
+            let node_key = self.key();
+            node_key_len = node_key.len();
+            while let Some(b) = key.peek().cloned() {
+                if common_prefix == node_key.len() {
+                    break;
+                }
+                if node_key[common_prefix] != b {
+                    break;
+                }
+                common_prefix += 1;
+                key.next();
+            }
+        }
 
+        if common_prefix == node_key_len {
+            if key.peek().is_none() {
+                self.value()
+            } else {
+                self.child().and_then(|child| child.get(key))
+            }
+        } else if common_prefix == 0 {
+            self.sibling().and_then(|sibling| sibling.get(key))
+        } else {
+            None
+        }
+    }
     pub fn insert<K>(&mut self, mut key: Peekable<K>, value: V) -> Option<V>
     where
         K: Iterator<Item = u8>,
@@ -379,5 +447,12 @@ mod test {
 
         assert_eq!(tree.insert("bar".bytes(), 7), Some(6));
         assert_eq!(tree.insert("baz".bytes(), 8), Some(7));
+
+        assert_eq!(tree.get("".bytes()), Some(&2));
+        assert_eq!(tree.get("foo".bytes()), Some(&4));
+        assert_eq!(tree.get("foobar".bytes()), Some(&5));
+        assert_eq!(tree.get("bar".bytes()), Some(&7));
+        assert_eq!(tree.get("baz".bytes()), Some(&8));
+        assert_eq!(tree.get("qux".bytes()), None);
     }
 }
