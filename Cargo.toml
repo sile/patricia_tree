@@ -1,0 +1,7 @@
+[package]
+name = "patricia_tree"
+version = "0.1.0"
+authors = ["Takeru Ohta <phjgt308@gmail.com>"]
+
+[dependencies]
+libc = "0.2"
