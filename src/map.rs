@@ -16,6 +16,9 @@ impl<V> PatriciaMap<V> {
     /// map.insert("foo".bytes(), 10);
     /// assert_eq!(map.len(), 1);
     /// assert_eq!(map.get("foo".bytes()), Some(&10));
+    ///
+    /// map.remove("foo".bytes());
+    /// assert_eq!(map.get("foo".bytes()), None);
     /// ```
     pub fn new() -> Self {
         PatriciaMap { tree: PatriciaTree::new() }
@@ -37,5 +40,11 @@ impl<V> PatriciaMap<V> {
         K: Iterator<Item = u8>,
     {
         self.tree.get(key)
+    }
+    pub fn remove<K>(&mut self, key: K) -> Option<V>
+    where
+        K: Iterator<Item = u8>,
+    {
+        self.tree.remove(key)
     }
 }

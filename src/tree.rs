@@ -34,6 +34,17 @@ impl<V> PatriciaTree<V> {
     {
         self.root.get(key.peekable())
     }
+    pub fn remove<K>(&mut self, key: K) -> Option<V>
+    where
+        K: Iterator<Item = u8>,
+    {
+        if let Some(old) = self.root.remove(key.peekable()) {
+            self.len -= 1;
+            Some(old)
+        } else {
+            None
+        }
+    }
     pub fn len(&self) -> usize {
         self.len
     }
@@ -362,6 +373,50 @@ impl<V> Node<V> {
             None
         }
     }
+    pub fn remove<K>(&mut self, mut key: Peekable<K>) -> Option<V>
+    where
+        K: Iterator<Item = u8>,
+    {
+        let mut common_prefix = 0;
+        let node_key_len;
+        {
+            let node_key = self.key();
+            node_key_len = node_key.len();
+            while let Some(b) = key.peek().cloned() {
+                if common_prefix == node_key.len() {
+                    break;
+                }
+                if node_key[common_prefix] != b {
+                    break;
+                }
+                common_prefix += 1;
+                key.next();
+            }
+        }
+
+        if common_prefix == node_key_len {
+            if key.peek().is_none() {
+                // TODO: 不要となったノードの削除・回収
+                self.take_value()
+            } else if let Some(mut child) = self.take_child() {
+                let old = child.remove(key);
+                self.set_child(child);
+                old
+            } else {
+                None
+            }
+        } else if common_prefix == 0 {
+            if let Some(mut sibling) = self.take_sibling() {
+                let old = sibling.remove(key);
+                self.set_sibling(sibling);
+                old
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
     pub fn insert<K>(&mut self, mut key: Peekable<K>, value: V) -> Option<V>
     where
         K: Iterator<Item = u8>,
@@ -453,6 +508,20 @@ mod test {
         assert_eq!(tree.get("foobar".bytes()), Some(&5));
         assert_eq!(tree.get("bar".bytes()), Some(&7));
         assert_eq!(tree.get("baz".bytes()), Some(&8));
+        assert_eq!(tree.get("qux".bytes()), None);
+
+        assert_eq!(tree.remove("".bytes()), Some(2));
+        assert_eq!(tree.remove("foo".bytes()), Some(4));
+        assert_eq!(tree.remove("foobar".bytes()), Some(5));
+        assert_eq!(tree.remove("bar".bytes()), Some(7));
+        assert_eq!(tree.remove("baz".bytes()), Some(8));
+        assert_eq!(tree.remove("qux".bytes()), None);
+
+        assert_eq!(tree.get("".bytes()), None);
+        assert_eq!(tree.get("foo".bytes()), None);
+        assert_eq!(tree.get("foobar".bytes()), None);
+        assert_eq!(tree.get("bar".bytes()), None);
+        assert_eq!(tree.get("baz".bytes()), None);
         assert_eq!(tree.get("qux".bytes()), None);
     }
 }
