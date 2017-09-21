@@ -48,6 +48,7 @@ bitflags! {
 //   - child: Option<usize>
 //   - sibling: Option<usize>
 
+// TODO: pack
 #[derive(Debug)]
 pub struct Node<V> {
     ptr: *mut u8,
@@ -105,12 +106,13 @@ impl<V> Node<V> {
                     offset += mem::size_of::<V>() as isize;
                 }
                 if let Some(child) = child {
-                    println!("#### {}: {}", offset, child.ptr as usize);
                     ptr::write(ptr.offset(offset) as _, child.ptr);
+                    mem::forget(child);
                     offset += mem::size_of::<usize>() as isize;
                 }
                 if let Some(sibling) = sibling {
                     ptr::write(ptr.offset(offset) as _, sibling.ptr);
+                    mem::forget(sibling);
                 }
             }
 
@@ -179,16 +181,22 @@ impl<V> Node<V> {
             None
         }
     }
+    // TODO:
+    // pub fn child_mut(&mut self) -> Option<&mut Node<V>> {
+    //     if let Some(offset) = self.child_offset() {
+    //         if self.flags().contains(Flags::CHILD_EXISTS) {
+    //             let child: *mut Node<V> = unsafe { *(self.ptr.offset(offset) as *mut _) };
+    //             return Some(unsafe { mem::transmute(child) });
+    //         }
+    //     }
+    //     None
+    // }
     pub fn take_child(&mut self) -> Option<Node<V>> {
         if let Some(offset) = self.child_offset() {
             if self.flags().contains(Flags::CHILD_EXISTS) {
-                println!("# {:?}, {:?}", self.value_offset(), self.child_offset());
-                println!("# BEFORE: {:?}", self.flags());
                 self.set_flags(Flags::CHILD_INITIALIZED, false);
-                println!("# AFTER: {:?}", self.flags());
                 let child = unsafe {
                     let ptr: *mut u8 = *(self.ptr.offset(offset) as *mut _);
-                    println!("@ {}", ptr as usize);
                     Node::from_ptr(ptr)
                 };
                 return Some(child);
@@ -200,7 +208,10 @@ impl<V> Node<V> {
         if let Some(offset) = self.sibling_offset() {
             if self.flags().contains(Flags::SIBLING_EXISTS) {
                 self.set_flags(Flags::SIBLING_INITIALIZED, false);
-                let sibling = unsafe { Node::from_ptr(self.ptr.offset(offset)) };
+                let sibling = unsafe {
+                    let ptr: *mut u8 = *(self.ptr.offset(offset) as *mut _);
+                    Node::from_ptr(ptr)
+                };
                 return Some(sibling);
             }
         }
@@ -235,19 +246,52 @@ impl<V> Node<V> {
             None
         }
     }
-
     pub fn set_child(&mut self, child: Self) {
         let _ = self.take_child();
         if let Some(offset) = self.child_offset() {
             self.set_flags(Flags::CHILD_INITIALIZED, true);
-            println!("### {}: {}", offset, child.ptr as usize);
             unsafe { ptr::write(self.ptr.offset(offset) as _, child.ptr) };
+            mem::forget(child);
         } else {
             let value = self.take_value();
             let sibling = self.take_sibling();
             let node = Node::new(self.key().iter().cloned(), value, Some(child), sibling);
             *self = node;
         }
+    }
+    pub fn set_sibling(&mut self, sibling: Self) {
+        let _ = self.take_sibling();
+        if let Some(offset) = self.sibling_offset() {
+            self.set_flags(Flags::SIBLING_INITIALIZED, true);
+            unsafe { ptr::write(self.ptr.offset(offset) as _, sibling.ptr) };
+            mem::forget(sibling);
+        } else {
+            let value = self.take_value();
+            let child = self.take_child();
+            let node = Node::new(self.key().iter().cloned(), value, child, Some(sibling));
+            *self = node;
+        }
+    }
+    fn split_at(&mut self, position: usize) -> Self {
+        debug_assert!(position < self.key_len() as usize);
+        let value = self.take_value();
+        let child = self.take_child();
+        let sibling = self.take_sibling();
+
+        let parent = Node::new(
+            self.key().iter().take(position).cloned(),
+            None,
+            None,
+            sibling,
+        );
+        let child = Node::new(
+            self.key().iter().skip(position).cloned(),
+            value,
+            child,
+            None,
+        );
+        *self = parent;
+        child
     }
 
     pub fn insert<K>(&mut self, mut key: Peekable<K>, value: V) -> Option<V>
@@ -274,15 +318,31 @@ impl<V> Node<V> {
         if common_prefix == node_key_len {
             if key.peek().is_none() {
                 self.set_value(value)
-            } else if let Some(child) = self.take_child() {
-                panic!()
+            } else if let Some(mut child) = self.take_child() {
+                let old = child.insert(key, value);
+                self.set_child(child);
+                old
             } else {
                 let child = Node::new(key, Some(value), None, None);
                 self.set_child(child);
                 None
             }
+        } else if common_prefix == 0 {
+            // TODO: sort by key
+            if let Some(mut sibling) = self.take_sibling() {
+                let old = sibling.insert(key, value);
+                self.set_sibling(sibling);
+                old
+            } else {
+                let sibling = Node::new(key, Some(value), None, None);
+                self.set_sibling(sibling);
+                None
+            }
         } else {
-            panic!("{:?}", (self.key(), common_prefix))
+            let mut child = self.split_at(common_prefix);
+            child.insert(key, value);
+            self.set_child(child);
+            None
         }
     }
 }
@@ -310,5 +370,14 @@ mod test {
         assert_eq!(tree.insert("".bytes(), 2), Some(1));
 
         assert_eq!(tree.insert("foo".bytes(), 3), None);
+        assert_eq!(tree.insert("foo".bytes(), 4), Some(3));
+
+        assert_eq!(tree.insert("foobar".bytes(), 5), None);
+
+        assert_eq!(tree.insert("bar".bytes(), 6), None);
+        assert_eq!(tree.insert("baz".bytes(), 7), None);
+
+        assert_eq!(tree.insert("bar".bytes(), 7), Some(6));
+        assert_eq!(tree.insert("baz".bytes(), 8), Some(7));
     }
 }
