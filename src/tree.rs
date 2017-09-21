@@ -45,6 +45,10 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
+    pub fn clear(&mut self) {
+        self.root = Node::root();
+        self.len = 0;
+    }
     pub fn len(&self) -> usize {
         self.len
     }
