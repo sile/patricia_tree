@@ -1,6 +1,15 @@
 use tree::PatriciaTree;
 
-#[derive(Debug)]
+// TODO: impl
+// - Clone
+// - Hash
+// - Eq
+// - Ord
+// - FromIterator
+// - IntoIterator
+// - Extend
+// - Index
+#[derive(Debug, Default)]
 pub struct PatriciaMap<V> {
     tree: PatriciaTree<V>,
 }
@@ -177,4 +186,13 @@ impl<V> PatriciaMap<V> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    // TODO:
+    // - iter
+    // - iter_mut
+    // - keys
+    // - values
+    // - values_mut
+    // - nodes (or graph)
+    // - from_nodes
 }

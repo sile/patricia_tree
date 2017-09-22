@@ -59,6 +59,11 @@ impl<V> PatriciaTree<V> {
         self.len
     }
 }
+impl<V> Default for PatriciaTree<V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 bitflags! {
     struct Flags: u8 {
@@ -532,8 +537,6 @@ impl<V> Drop for Node<V> {
         }
     }
 }
-
-
 
 #[cfg(test)]
 mod test {
