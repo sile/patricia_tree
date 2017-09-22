@@ -1,10 +1,9 @@
+use std::fmt;
 use std::iter::FromIterator;
 
 use node::Node;
 use tree::{self, PatriciaTree};
 
-// TODO: impl
-// - Debug
 #[derive(Default, Clone)]
 pub struct PatriciaMap<V> {
     tree: PatriciaTree<V>,
@@ -275,16 +274,17 @@ impl<V> PatriciaMap<V> {
         ValuesMut { nodes: self.tree.nodes() }
     }
 }
-impl<V: 'static> IntoIterator for PatriciaMap<V> {
-    type Item = (Vec<u8>, V);
-    type IntoIter = IntoIter<V>;
-    fn into_iter(self) -> Self::IntoIter {
-        let nodes = unsafe { ::std::mem::transmute(self.tree.nodes()) };
-        IntoIter {
-            tree: self.tree,
-            nodes,
-            key: Vec::new(),
+impl<V: fmt::Debug> fmt::Debug for PatriciaMap<V> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{")?;
+        for (i, (k, v)) in self.iter().enumerate() {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{:?}: {:?}", k, v)?;
         }
+        write!(f, "}}")?;
+        Ok(())
     }
 }
 impl<K, V> FromIterator<(K, V)> for PatriciaMap<V>
@@ -370,26 +370,6 @@ impl<'a, V: 'a> Iterator for IterMut<'a, V> {
 }
 
 #[derive(Debug)]
-pub struct IntoIter<V: 'static> {
-    tree: PatriciaTree<V>,
-    nodes: tree::Nodes<'static, V>,
-    key: Vec<u8>,
-}
-impl<V: 'static> Iterator for IntoIter<V> {
-    type Item = (Vec<u8>, V);
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some((key_len, node)) = self.nodes.next() {
-            self.key.truncate(key_len);
-            self.key.extend(node.key());
-            if let Some(value) = node.take_value() {
-                return Some((self.key.clone(), value));
-            }
-        }
-        None
-    }
-}
-
-#[derive(Debug)]
 pub struct Keys<'a, V: 'a>(Iter<'a, V>);
 impl<'a, V: 'a> Iterator for Keys<'a, V> {
     type Item = Vec<u8>;
@@ -427,5 +407,21 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
             }
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn debug_works() {
+        let map: PatriciaMap<_> = vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)]
+            .into_iter()
+            .collect();
+        assert_eq!(
+            format!("{:?}", map),
+            "{[98, 97, 114]: 2, [98, 97, 122]: 3, [102, 111, 111]: 1}"
+        );
     }
 }
