@@ -68,6 +68,19 @@ impl<V> Default for PatriciaTree<V> {
         Self::new()
     }
 }
+impl<V> From<Node<V>> for PatriciaTree<V> {
+    fn from(f: Node<V>) -> Self {
+        let mut this = PatriciaTree { root: f, len: 0 };
+        let count = this.nodes().count();
+        this.len = count;
+        this
+    }
+}
+impl<V> From<PatriciaTree<V>> for Node<V> {
+    fn from(f: PatriciaTree<V>) -> Self {
+        f.root
+    }
+}
 
 #[derive(Debug)]
 pub struct Nodes<'a, V: 'a> {

@@ -1,5 +1,6 @@
 use std::iter::FromIterator;
 
+use node::Node;
 use tree::{self, PatriciaTree};
 
 // TODO: impl
@@ -312,6 +313,21 @@ where
         for (k, v) in iter {
             self.insert(k, v);
         }
+    }
+}
+impl<V> From<Node<V>> for PatriciaMap<V> {
+    fn from(f: Node<V>) -> Self {
+        PatriciaMap { tree: f.into() }
+    }
+}
+impl<V> From<PatriciaMap<V>> for Node<V> {
+    fn from(f: PatriciaMap<V>) -> Self {
+        f.tree.into()
+    }
+}
+impl<V> AsRef<Node<V>> for PatriciaMap<V> {
+    fn as_ref(&self) -> &Node<V> {
+        self.tree.root()
     }
 }
 
