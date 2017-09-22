@@ -34,6 +34,12 @@ impl<V> PatriciaTree<V> {
     {
         self.root.get(key.peekable())
     }
+    pub fn get_mut<K>(&mut self, key: K) -> Option<&mut V>
+    where
+        K: Iterator<Item = u8>,
+    {
+        self.root.get_mut(key.peekable())
+    }
     pub fn remove<K>(&mut self, key: K) -> Option<V>
     where
         K: Iterator<Item = u8>,
@@ -264,6 +270,15 @@ impl<V> Node<V> {
         }
         None
     }
+    pub fn value_mut(&self) -> Option<&mut V> {
+        if let Some(offset) = self.value_offset() {
+            if self.flags().contains(Flags::VALUE_EXISTS) {
+                let value: *mut V = unsafe { self.ptr.offset(offset) as _ };
+                return Some(unsafe { mem::transmute(value) });
+            }
+        }
+        None
+    }
     pub fn child(&self) -> Option<&Node<V>> {
         if let Some(offset) = self.child_offset() {
             if self.flags().contains(Flags::CHILD_EXISTS) {
@@ -373,6 +388,40 @@ impl<V> Node<V> {
             }
         } else if common_prefix == 0 {
             self.sibling().and_then(|sibling| sibling.get(key))
+        } else {
+            None
+        }
+    }
+    pub fn get_mut<K>(&self, mut key: Peekable<K>) -> Option<&mut V>
+    where
+        K: Iterator<Item = u8>,
+    {
+        // TODO: 共通化
+        let mut common_prefix = 0;
+        let node_key_len;
+        {
+            let node_key = self.key();
+            node_key_len = node_key.len();
+            while let Some(b) = key.peek().cloned() {
+                if common_prefix == node_key.len() {
+                    break;
+                }
+                if node_key[common_prefix] != b {
+                    break;
+                }
+                common_prefix += 1;
+                key.next();
+            }
+        }
+
+        if common_prefix == node_key_len {
+            if key.peek().is_none() {
+                self.value_mut()
+            } else {
+                self.child().and_then(|child| child.get_mut(key))
+            }
+        } else if common_prefix == 0 {
+            self.sibling().and_then(|sibling| sibling.get_mut(key))
         } else {
             None
         }

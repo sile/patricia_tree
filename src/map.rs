@@ -42,7 +42,7 @@ impl<V> PatriciaMap<V> {
         self.tree.clear();
     }
 
-    /// Returns true if this map contains a value for the specified key.
+    /// Returns `true` if this map contains a value for the specified key.
     ///
     /// # Examples
     ///
@@ -81,22 +81,100 @@ impl<V> PatriciaMap<V> {
         self.tree.get(key)
     }
 
-    pub fn len(&self) -> usize {
-        self.tree.len()
+    /// Returns a mutable reference to the value corresponding to the key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map = PatriciaMap::new();
+    /// map.insert("foo".bytes(), 1);
+    /// map.get_mut("foo".bytes()).map(|v| *v = 2);
+    /// assert_eq!(map.get("foo".bytes()), Some(&2));
+    /// ```
+    pub fn get_mut<K>(&mut self, key: K) -> Option<&mut V>
+    where
+        K: Iterator<Item = u8>,
+    {
+        self.tree.get_mut(key)
     }
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
+
+    /// Inserts a key-value pair into this map.
+    ///
+    /// If the map did not have this key present, `None` is returned.
+    /// If the map did have this key present, the value is updated, and the old value is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map = PatriciaMap::new();
+    /// assert_eq!(map.insert("foo".bytes(), 1), None);
+    /// assert_eq!(map.get("foo".bytes()), Some(&1));
+    /// assert_eq!(map.insert("foo".bytes(), 2), Some(1));
+    /// assert_eq!(map.get("foo".bytes()), Some(&2));
+    /// ```
     pub fn insert<K>(&mut self, key: K, value: V) -> Option<V>
     where
         K: Iterator<Item = u8>,
     {
         self.tree.insert(key, value)
     }
+
+    /// Removes a key from this map, returning the value at the key if the key was previously in the map.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map = PatriciaMap::new();
+    /// map.insert("foo".bytes(), 1);
+    /// assert_eq!(map.remove("foo".bytes()), Some(1));
+    /// assert_eq!(map.remove("foo".bytes()), None);
+    /// ```
     pub fn remove<K>(&mut self, key: K) -> Option<V>
     where
         K: Iterator<Item = u8>,
     {
         self.tree.remove(key)
+    }
+
+    /// Returns the number of elements in this map.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map = PatriciaMap::new();
+    /// map.insert("foo".bytes(), 1);
+    /// map.insert("bar".bytes(), 2);
+    /// assert_eq!(map.len(), 2);
+    /// ```
+    pub fn len(&self) -> usize {
+        self.tree.len()
+    }
+
+    /// Returns `true` if this map contains no elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map = PatriciaMap::new();
+    /// assert!(map.is_empty());
+    ///
+    /// map.insert("foo".bytes(), 1);
+    /// assert!(!map.is_empty());
+    ///
+    /// map.clear();
+    /// assert!(map.is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
