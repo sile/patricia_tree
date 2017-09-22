@@ -5,7 +5,7 @@ use std::ptr;
 use std::slice;
 use libc;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PatriciaTree<V> {
     root: Node<V>,
     len: usize,
@@ -537,6 +537,15 @@ impl<V> Drop for Node<V> {
         }
     }
 }
+impl<V: Clone> Clone for Node<V> {
+    fn clone(&self) -> Self {
+        let key = self.key();
+        let value = self.value().cloned();
+        let child = self.child().cloned();
+        let sibling = self.sibling().cloned();
+        Node::new(key.iter().cloned(), value, child, sibling)
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -566,6 +575,13 @@ mod test {
         assert_eq!(tree.get("baz".bytes()), Some(&8));
         assert_eq!(tree.get("qux".bytes()), None);
 
+        let tree2 = tree.clone();
+        assert_eq!(tree2.get("".bytes()), Some(&2));
+        assert_eq!(tree2.get("foo".bytes()), Some(&4));
+        assert_eq!(tree2.get("foobar".bytes()), Some(&5));
+        assert_eq!(tree2.get("bar".bytes()), Some(&7));
+        assert_eq!(tree2.get("baz".bytes()), Some(&8));
+
         assert_eq!(tree.remove("".bytes()), Some(2));
         assert_eq!(tree.remove("foo".bytes()), Some(4));
         assert_eq!(tree.remove("foobar".bytes()), Some(5));
@@ -579,5 +595,11 @@ mod test {
         assert_eq!(tree.get("bar".bytes()), None);
         assert_eq!(tree.get("baz".bytes()), None);
         assert_eq!(tree.get("qux".bytes()), None);
+
+        assert_eq!(tree2.get("".bytes()), Some(&2));
+        assert_eq!(tree2.get("foo".bytes()), Some(&4));
+        assert_eq!(tree2.get("foobar".bytes()), Some(&5));
+        assert_eq!(tree2.get("bar".bytes()), Some(&7));
+        assert_eq!(tree2.get("baz".bytes()), Some(&8));
     }
 }

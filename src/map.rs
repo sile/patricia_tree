@@ -1,15 +1,11 @@
+use std::iter::FromIterator;
+
 use tree::PatriciaTree;
 
 // TODO: impl
 // - Clone
-// - Hash
-// - Eq
-// - Ord
-// - FromIterator
 // - IntoIterator
-// - Extend
-// - Index
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct PatriciaMap<V> {
     tree: PatriciaTree<V>,
 }
@@ -187,6 +183,21 @@ impl<V> PatriciaMap<V> {
         self.len() == 0
     }
 
+    /// Gets an iterator over the entries of this map, sorted by key.
+    ///
+    // # Examples
+    //
+    // ```
+    // use patricia_tree::PatriciaMap;
+    //
+    // let map: PatriciaMap<_> =
+    //     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
+    // assert_eq!(vec![(Vec::from("bar"), &2), ("baz".into(), &3), ("foo".into(), &1)],
+    //            map.iter().collect::<Vec<_>>());
+    // ```
+    pub fn iter(&self) -> Iter<V> {
+        unimplemented!()
+    }
     // TODO:
     // - iter
     // - iter_mut
@@ -195,4 +206,41 @@ impl<V> PatriciaMap<V> {
     // - values_mut
     // - nodes (or graph)
     // - from_nodes
+}
+impl<K, V> FromIterator<(K, V)> for PatriciaMap<V>
+where
+    K: Iterator<Item = u8>,
+{
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+    {
+        let mut map = PatriciaMap::new();
+        for (k, v) in iter {
+            map.insert(k, v);
+        }
+        map
+    }
+}
+impl<K, V> Extend<(K, V)> for PatriciaMap<V>
+where
+    K: Iterator<Item = u8>,
+{
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = (K, V)>,
+    {
+        for (k, v) in iter {
+            self.insert(k, v);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Iter<'a, V>(::std::marker::PhantomData<(&'a u8, V)>);
+impl<'a, V: 'a> Iterator for Iter<'a, V> {
+    type Item = (Vec<u8>, &'a V);
+    fn next(&mut self) -> Option<Self::Item> {
+        unimplemented!()
+    }
 }
