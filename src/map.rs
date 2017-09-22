@@ -1,11 +1,10 @@
 use std::iter::FromIterator;
 
-use tree::PatriciaTree;
+use tree::{self, PatriciaTree};
 
 // TODO: impl
-// - Clone
-// - IntoIterator
-#[derive(Debug, Default, Clone)]
+// - Debug
+#[derive(Default, Clone)]
 pub struct PatriciaMap<V> {
     tree: PatriciaTree<V>,
 }
@@ -183,29 +182,109 @@ impl<V> PatriciaMap<V> {
         self.len() == 0
     }
 
+
     /// Gets an iterator over the entries of this map, sorted by key.
     ///
-    // # Examples
-    //
-    // ```
-    // use patricia_tree::PatriciaMap;
-    //
-    // let map: PatriciaMap<_> =
-    //     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
-    // assert_eq!(vec![(Vec::from("bar"), &2), ("baz".into(), &3), ("foo".into(), &1)],
-    //            map.iter().collect::<Vec<_>>());
-    // ```
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let map: PatriciaMap<_> =
+    ///     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
+    /// assert_eq!(vec![(Vec::from("bar"), &2), ("baz".into(), &3), ("foo".into(), &1)],
+    ///            map.iter().collect::<Vec<_>>());
+    /// ```
     pub fn iter(&self) -> Iter<V> {
-        unimplemented!()
+        Iter {
+            nodes: self.tree.nodes(),
+            key: Vec::new(),
+        }
     }
-    // TODO:
-    // - iter
-    // - iter_mut
-    // - keys
-    // - values
-    // - values_mut
-    // - nodes (or graph)
-    // - from_nodes
+
+    /// Gets a mutable iterator over the entries of this map, soretd by key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map: PatriciaMap<_> =
+    ///     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
+    /// for (_, v) in map.iter_mut() {
+    ///    *v += 10;
+    /// }
+    /// assert_eq!(map.get("bar".bytes()), Some(&12));
+    /// ```
+    pub fn iter_mut(&mut self) -> IterMut<V> {
+        IterMut {
+            nodes: self.tree.nodes(),
+            key: Vec::new(),
+        }
+    }
+
+    /// Gets an iterator over the keys of this map, in sorted order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let map: PatriciaMap<_> =
+    ///     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
+    /// assert_eq!(vec![Vec::from("bar"), "baz".into(), "foo".into()],
+    ///            map.keys().collect::<Vec<_>>());
+    /// ```
+    pub fn keys(&self) -> Keys<V> {
+        Keys(self.iter())
+    }
+
+    /// Gets an iterator over the values of this map, in order by key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let map: PatriciaMap<_> =
+    ///     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
+    /// assert_eq!(vec![2, 3, 1],
+    ///            map.values().cloned().collect::<Vec<_>>());
+    /// ```
+    pub fn values(&self) -> Values<V> {
+        Values { nodes: self.tree.nodes() }
+    }
+
+    /// Gets a mutable iterator over the values of this map, in order by key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map: PatriciaMap<_> =
+    ///     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
+    /// for v in map.values_mut() {
+    ///     *v += 10;
+    /// }
+    /// assert_eq!(vec![12, 13, 11],
+    ///            map.values().cloned().collect::<Vec<_>>());
+    /// ```
+    pub fn values_mut(&mut self) -> ValuesMut<V> {
+        ValuesMut { nodes: self.tree.nodes() }
+    }
+}
+impl<V: 'static> IntoIterator for PatriciaMap<V> {
+    type Item = (Vec<u8>, V);
+    type IntoIter = IntoIter<V>;
+    fn into_iter(self) -> Self::IntoIter {
+        let nodes = unsafe { ::std::mem::transmute(self.tree.nodes()) };
+        IntoIter {
+            tree: self.tree,
+            nodes,
+            key: Vec::new(),
+        }
+    }
 }
 impl<K, V> FromIterator<(K, V)> for PatriciaMap<V>
 where
@@ -237,10 +316,100 @@ where
 }
 
 #[derive(Debug)]
-pub struct Iter<'a, V>(::std::marker::PhantomData<(&'a u8, V)>);
+pub struct Iter<'a, V: 'a> {
+    nodes: tree::Nodes<'a, V>,
+    key: Vec<u8>,
+}
 impl<'a, V: 'a> Iterator for Iter<'a, V> {
     type Item = (Vec<u8>, &'a V);
     fn next(&mut self) -> Option<Self::Item> {
-        unimplemented!()
+        while let Some((key_len, node)) = self.nodes.next() {
+            self.key.truncate(key_len);
+            self.key.extend(node.key());
+            if let Some(value) = node.value() {
+                return Some((self.key.clone(), value));
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug)]
+pub struct IterMut<'a, V: 'a> {
+    nodes: tree::Nodes<'a, V>,
+    key: Vec<u8>,
+}
+impl<'a, V: 'a> Iterator for IterMut<'a, V> {
+    type Item = (Vec<u8>, &'a mut V);
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((key_len, node)) = self.nodes.next() {
+            self.key.truncate(key_len);
+            self.key.extend(node.key());
+            if let Some(value) = node.value_mut() {
+                return Some((self.key.clone(), value));
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug)]
+pub struct IntoIter<V: 'static> {
+    tree: PatriciaTree<V>,
+    nodes: tree::Nodes<'static, V>,
+    key: Vec<u8>,
+}
+impl<V: 'static> Iterator for IntoIter<V> {
+    type Item = (Vec<u8>, V);
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((key_len, node)) = self.nodes.next() {
+            self.key.truncate(key_len);
+            self.key.extend(node.key());
+            if let Some(value) = node.take_value() {
+                return Some((self.key.clone(), value));
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug)]
+pub struct Keys<'a, V: 'a>(Iter<'a, V>);
+impl<'a, V: 'a> Iterator for Keys<'a, V> {
+    type Item = Vec<u8>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|(k, _)| k)
+    }
+}
+
+#[derive(Debug)]
+pub struct Values<'a, V: 'a> {
+    nodes: tree::Nodes<'a, V>,
+}
+impl<'a, V: 'a> Iterator for Values<'a, V> {
+    type Item = &'a V;
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((_, node)) = self.nodes.next() {
+            if let Some(value) = node.value() {
+                return Some(value);
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug)]
+pub struct ValuesMut<'a, V: 'a> {
+    nodes: tree::Nodes<'a, V>,
+}
+impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
+    type Item = &'a mut V;
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((_, node)) = self.nodes.next() {
+            if let Some(value) = node.value_mut() {
+                return Some(value);
+            }
+        }
+        None
     }
 }

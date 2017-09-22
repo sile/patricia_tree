@@ -5,4 +5,6 @@ extern crate libc;
 pub use map::PatriciaMap;
 
 pub mod map;
-pub mod tree;
+pub mod node;
+
+mod tree;
