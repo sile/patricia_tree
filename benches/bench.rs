@@ -27,7 +27,7 @@ fn bench_retrieval(b: &mut test::Bencher) {
 
 #[bench]
 fn bench_removal(b: &mut test::Bencher) {
-    const MAX: usize = 1_000_000;
+    const MAX: usize = 5_000_000;
 
     let mut set = PatriciaSet::new();
     for i in 0..MAX {
