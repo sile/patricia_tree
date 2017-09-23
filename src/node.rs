@@ -5,6 +5,16 @@ use std::ptr;
 use std::slice;
 use libc;
 
+macro_rules! assert_some {
+    ($expr:expr) => {
+        if let Some(value) = $expr {
+            value
+        } else {
+            panic!("`{}` must be `Some(..)`", stringify!($expr));
+        }
+    }
+}
+
 bitflags! {
     struct Flags: u8 {
         const VALUE_ALLOCATED = 0b0000_0001;
@@ -21,6 +31,8 @@ bitflags! {
 const FLAGS_OFFSET: isize = 0;
 const LABEL_LEN_OFFSET: isize = 1;
 const LABEL_OFFSET: isize = 2;
+
+const MAX_LABEL_LEN: usize = 255;
 
 /// A node which represents a subtree of a patricia tree.
 ///
@@ -310,7 +322,6 @@ impl<V> Node<V> {
             self.child_mut().and_then(|child| child.get_mut(key))
         }
     }
-    // TODO: 不要となったノードの削除・回収
     pub(crate) fn remove<K>(&mut self, mut key: Peekable<K>) -> Option<V>
     where
         K: Iterator<Item = u8>,
@@ -319,14 +330,22 @@ impl<V> Node<V> {
             None
         } else if let Some(common_prefix_len) = self.skip_common_prefix(&mut key) {
             if common_prefix_len == 0 {
-                self.sibling_mut().and_then(|sibling| sibling.remove(key))
+                let result = self.sibling_mut().and_then(|sibling| sibling.remove(key));
+                if result.is_some() {
+                    self.try_reclaim_sibling();
+                }
+                result
             } else {
                 None
             }
         } else if key.peek().is_none() {
             self.take_value()
         } else {
-            self.child_mut().and_then(|child| child.remove(key))
+            let result = self.child_mut().and_then(|child| child.remove(key));
+            if result.is_some() {
+                self.try_reclaim_child();
+            }
+            result
         }
     }
     pub(crate) fn insert<K>(&mut self, mut key: Peekable<K>, value: V) -> Option<V>
@@ -387,7 +406,7 @@ impl<V> Node<V> {
     where
         K: Iterator<Item = u8>,
     {
-        let mut label_bytes = [0; 255];
+        let mut label_bytes = [0; MAX_LABEL_LEN];
         let mut label_len = 0;
         while let Some(&b) = label.peek() {
             label_bytes[label_len] = b;
@@ -451,8 +470,8 @@ impl<V> Node<V> {
         flags.set(other, value);
         unsafe { ptr::write(self.ptr, flags.bits() as u8) };
     }
-    fn label_len(&self) -> u8 {
-        unsafe { *self.ptr.offset(LABEL_LEN_OFFSET) }
+    fn label_len(&self) -> usize {
+        unsafe { *self.ptr.offset(LABEL_LEN_OFFSET) as usize }
     }
     fn value_offset(&self) -> Option<isize> {
         let flags = self.flags();
@@ -491,7 +510,7 @@ impl<V> Node<V> {
     }
     // TODO
     fn split_at(&mut self, position: usize) -> Self {
-        debug_assert!(position < self.label_len() as usize);
+        debug_assert!(position < self.label_len());
         let value = self.take_value();
         let child = self.take_child();
         let sibling = self.take_sibling();
@@ -510,6 +529,43 @@ impl<V> Node<V> {
         );
         *self = parent;
         child
+    }
+    fn try_reclaim_sibling(&mut self) {
+        let flags = assert_some!(self.sibling()).flags();
+        if flags.intersects(Flags::VALUE_INITIALIZED | Flags::CHILD_INITIALIZED) {
+            return;
+        }
+        if let Some(sibling) = self.take_sibling().and_then(|mut n| n.take_sibling()) {
+            self.set_sibling(sibling);
+        }
+    }
+    fn try_reclaim_child(&mut self) {
+        let flags = assert_some!(self.child()).flags();
+        if !flags.intersects(Flags::VALUE_INITIALIZED | Flags::CHILD_INITIALIZED) {
+            if let Some(child) = self.take_child().and_then(|mut n| n.take_sibling()) {
+                self.set_child(child);
+            } else {
+                return;
+            }
+        }
+
+        let flags = assert_some!(self.child()).flags();
+        if !self.flags().contains(Flags::VALUE_INITIALIZED) &&
+            !flags.contains(Flags::SIBLING_INITIALIZED) &&
+            (self.label_len() + assert_some!(self.child()).label_len()) <= MAX_LABEL_LEN
+        {
+            let mut child = assert_some!(self.take_child());
+            let sibling = self.take_sibling();
+            let value = child.take_value();
+            let grandchild = child.take_child();
+            let node = Self::new(
+                self.label().iter().chain(child.label().iter()).cloned(),
+                value,
+                grandchild,
+                sibling,
+            );
+            *self = node;
+        }
     }
 }
 impl<V> Drop for Node<V> {
