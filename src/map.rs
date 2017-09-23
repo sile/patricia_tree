@@ -1,3 +1,4 @@
+//! A map based on a patricia tree.
 use std::fmt;
 use std::iter::FromIterator;
 use std::mem;
@@ -5,6 +6,7 @@ use std::mem;
 use node::Node;
 use tree::{self, PatriciaTree};
 
+/// A map based on a patricia tree.
 #[derive(Default, Clone)]
 pub struct PatriciaMap<V> {
     tree: PatriciaTree<V>,
@@ -115,7 +117,7 @@ impl<V> PatriciaMap<V> {
         self.tree.insert(key, value)
     }
 
-    /// Removes a key from this map, returning the value at the key if the key was previously in the map.
+    /// Removes a key from this map, returning the value at the key if the key was previously in it.
     ///
     /// # Examples
     ///
@@ -326,6 +328,7 @@ impl<V> AsRef<Node<V>> for PatriciaMap<V> {
     }
 }
 
+/// An iterator over a `PatriciaMap`'s entries.
 #[derive(Debug)]
 pub struct Iter<'a, V: 'a> {
     nodes: tree::Nodes<'a, V>,
@@ -345,6 +348,7 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
     }
 }
 
+/// An owning iterator over a `PatriciaMap`'s entries.
 #[derive(Debug)]
 pub struct IntoIter<V> {
     nodes: tree::IntoNodes<V>,
@@ -364,6 +368,7 @@ impl<V> Iterator for IntoIter<V> {
     }
 }
 
+/// A mutable iterator over a `PatriciaMap`'s entries.
 #[derive(Debug)]
 pub struct IterMut<'a, V: 'a> {
     nodes: tree::Nodes<'a, V>,
@@ -386,6 +391,7 @@ impl<'a, V: 'a> Iterator for IterMut<'a, V> {
     }
 }
 
+/// An iterator over a `PatriciaMap`'s keys.
 #[derive(Debug)]
 pub struct Keys<'a, V: 'a>(Iter<'a, V>);
 impl<'a, V: 'a> Iterator for Keys<'a, V> {
@@ -395,6 +401,7 @@ impl<'a, V: 'a> Iterator for Keys<'a, V> {
     }
 }
 
+/// An iterator over a `PatriciaMap`'s values.
 #[derive(Debug)]
 pub struct Values<'a, V: 'a> {
     nodes: tree::Nodes<'a, V>,
@@ -411,6 +418,7 @@ impl<'a, V: 'a> Iterator for Values<'a, V> {
     }
 }
 
+/// A mutable iterator over a `PatriciaMap`'s values.
 #[derive(Debug)]
 pub struct ValuesMut<'a, V: 'a> {
     nodes: tree::Nodes<'a, V>,

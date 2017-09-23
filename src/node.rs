@@ -1,3 +1,4 @@
+//! A node which represents a subtree of a patricia tree.
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
@@ -18,7 +19,7 @@ bitflags! {
     struct Flags: u8 {
         const VALUE_ALLOCATED = 0b0000_0001;
         const VALUE_INITIALIZED = 0b0000_0010;
-        
+
         const CHILD_ALLOCATED = 0b0000_0100;
         const CHILD_INITIALIZED = 0b0000_1000;
 
@@ -320,6 +321,30 @@ impl<V> Node<V> {
         }
     }
 
+    /// Gets an iterator which traverses the nodes in this tree, in depth first order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::node::Node;
+    ///
+    /// let mut set = PatriciaSet::new();
+    /// set.insert("foo");
+    /// set.insert("bar");
+    /// set.insert("baz");
+    ///
+    /// let node = Node::from(set);
+    /// let nodes = node.iter().map(|(level, node)| (level, node.label())).collect::<Vec<_>>();
+    /// assert_eq!(nodes,
+    ///            [
+    ///                (0, "".as_ref()),
+    ///                (1, "ba".as_ref()),
+    ///                (2, "r".as_ref()),
+    ///                (2, "z".as_ref()),
+    ///                (1, "foo".as_ref())
+    ///            ]);
+    /// ```
     pub fn iter(&self) -> Iter<V> {
         Iter { stack: vec![(0, self)] }
     }
@@ -545,6 +570,9 @@ impl<V> IntoIterator for Node<V> {
     }
 }
 
+/// An iterator which traverses the nodes in a tree, in depth first order.
+///
+/// The first element of an item is the level of the traversing node.
 #[derive(Debug)]
 pub struct Iter<'a, V: 'a> {
     stack: Vec<(usize, &'a Node<V>)>,
@@ -566,6 +594,9 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
     }
 }
 
+/// An owning iterator which traverses the nodes in a tree, in depth first order.
+///
+/// The first element of an item is the level of the traversing node.
 #[derive(Debug)]
 pub struct IntoIter<V> {
     stack: Vec<(usize, Node<V>)>,

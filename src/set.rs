@@ -1,9 +1,11 @@
+//! A set based on a patricia tree.
 use std::fmt;
 use std::iter::FromIterator;
 
 use map::{self, PatriciaMap};
 use node::Node;
 
+/// A set based on a patricia tree.
 #[derive(Default, Clone)]
 pub struct PatriciaSet {
     map: PatriciaMap<()>,
@@ -202,6 +204,7 @@ impl AsRef<Node<()>> for PatriciaSet {
     }
 }
 
+/// An Iterator over a `PatriciaSet`'s items.
 #[derive(Debug)]
 pub struct Iter<'a>(map::Keys<'a, ()>);
 impl<'a> Iterator for Iter<'a> {
@@ -211,6 +214,7 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
+/// An owning iterator over a `PatriciaSet`'s items.
 #[derive(Debug)]
 pub struct IntoIter(map::IntoIter<()>);
 impl Iterator for IntoIter {
