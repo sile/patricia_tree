@@ -416,19 +416,24 @@ impl<V> Node<V> {
 
         let common_prefix_len = self.skip_common_prefix(key);
         let next = &key[common_prefix_len..];
-        if common_prefix_len == self.label().len() {
-            if next.is_empty() {
+        let is_label_matched = common_prefix_len == self.label().len();
+        if next.is_empty() {
+            if is_label_matched {
                 let old = self.take_value();
                 self.set_value(value);
                 old
             } else {
-                if let Some(child) = self.child_mut() {
-                    return child.insert(next, value);
-                }
-                let child = Node::new(next, Some(value), None, None);
-                self.set_child(child);
+                self.split_at(common_prefix_len);
+                self.set_value(value);
                 None
             }
+        } else if is_label_matched {
+            if let Some(child) = self.child_mut() {
+                return child.insert(next, value);
+            }
+            let child = Node::new(next, Some(value), None, None);
+            self.set_child(child);
+            None
         } else if common_prefix_len == 0 {
             if let Some(sibling) = self.sibling_mut() {
                 return sibling.insert(next, value);
@@ -615,5 +620,22 @@ impl<V> Iterator for IntoIter<V> {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn long_label_works() {
+        let node = Node::new(&[b'a'; 256][..], Some(10), None, None);
+        assert_eq!(node.label(), &[b'a'; 255][..]);
+        assert_eq!(node.value(), None);
+        assert_eq!(node.child().is_some(), true);
+
+        let child = node.child().unwrap();
+        assert_eq!(child.label(), b"a");
+        assert_eq!(child.value(), Some(&10));
     }
 }

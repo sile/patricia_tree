@@ -236,4 +236,23 @@ mod test {
             "{[98, 97, 114], [98, 97, 122], [102, 111, 111]}"
         );
     }
+
+    #[test]
+    fn clear_works() {
+        let mut set = PatriciaSet::new();
+        set.insert("foo");
+        assert!(!set.is_empty());
+
+        set.clear();
+        assert!(set.is_empty());
+    }
+
+    #[test]
+    fn into_iter_works() {
+        let set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        assert_eq!(
+            set.into_iter().collect::<Vec<_>>(),
+            [Vec::from("bar"), "baz".into(), "foo".into()]
+        );
+    }
 }

@@ -439,7 +439,32 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
 
 #[cfg(test)]
 mod test {
+    use rand::{self, Rng};
     use super::*;
+
+    #[test]
+    fn it_works() {
+        let input = [
+            ("7", 7),
+            ("43", 43),
+            ("92", 92),
+            ("37", 37),
+            ("31", 31),
+            ("21", 21),
+            ("0", 0),
+            ("35", 35),
+            ("47", 47),
+            ("82", 82),
+            ("61", 61),
+            ("9", 9),
+        ];
+
+        let mut map = PatriciaMap::new();
+        for &(ref k, v) in input.iter() {
+            assert_eq!(map.insert(k, v), None);
+            assert_eq!(map.get(k), Some(&v));
+        }
+    }
 
     #[test]
     fn debug_works() {
@@ -450,5 +475,68 @@ mod test {
             format!("{:?}", map),
             "{[98, 97, 114]: 2, [98, 97, 122]: 3, [102, 111, 111]: 1}"
         );
+    }
+
+    #[test]
+    fn clear_works() {
+        let mut map = PatriciaMap::new();
+        assert!(map.is_empty());
+
+        map.insert("foo", 1);
+        assert!(!map.is_empty());
+
+        map.clear();
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn into_iter_works() {
+        let map: PatriciaMap<_> = vec![("foo", 1), ("bar", 2), ("baz", 3)]
+            .into_iter()
+            .collect();
+        assert_eq!(
+            map.into_iter().collect::<Vec<_>>(),
+            [(Vec::from("bar"), 2), ("baz".into(), 3), ("foo".into(), 1)]
+        );
+    }
+
+    #[test]
+    fn large_map_works() {
+        let mut input = (0..10000).map(|i| (i.to_string(), i)).collect::<Vec<_>>();
+        rand::thread_rng().shuffle(&mut input[..]);
+
+        // Insert
+        let mut map = input.iter().cloned().collect::<PatriciaMap<_>>();
+        assert_eq!(map.len(), input.len());
+
+        // Get
+        for &(ref k, v) in input.iter() {
+            assert_eq!(map.get(k), Some(&v));
+        }
+
+        // Remove
+        for &(ref k, v) in input.iter().take(input.len() / 2) {
+            assert_eq!(map.remove(k), Some(v));
+            assert_eq!(map.remove(k), None);
+        }
+        for &(ref k, _) in input.iter().take(input.len() / 2) {
+            assert_eq!(map.get(k), None);
+        }
+        for &(ref k, v) in input.iter().skip(input.len() / 2) {
+            assert_eq!(map.get(k), Some(&v));
+        }
+
+        // Insert
+        for &(ref k, v) in input.iter().take(input.len() / 2) {
+            assert_eq!(map.insert(k, v), None);
+        }
+        for &(ref k, v) in input.iter().skip(input.len() / 2) {
+            assert_eq!(map.insert(k, v), Some(v));
+        }
+
+        // Get
+        for &(ref k, v) in input.iter() {
+            assert_eq!(map.get(k), Some(&v));
+        }
     }
 }

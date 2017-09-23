@@ -27,6 +27,8 @@
 #[macro_use]
 extern crate bitflags;
 extern crate libc;
+#[cfg(test)]
+extern crate rand;
 
 pub use map::PatriciaMap;
 pub use set::PatriciaSet;
