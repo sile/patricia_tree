@@ -272,6 +272,16 @@ impl<V: fmt::Debug> fmt::Debug for PatriciaMap<V> {
         Ok(())
     }
 }
+impl<V> IntoIterator for PatriciaMap<V> {
+    type Item = (Vec<u8>, V);
+    type IntoIter = IntoIter<V>;
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter {
+            nodes: self.tree.into_nodes(),
+            key: Vec::new(),
+        }
+    }
+}
 impl<K, V> FromIterator<(K, V)> for PatriciaMap<V>
 where
     K: AsRef<[u8]>,
@@ -307,7 +317,7 @@ impl<V> From<Node<V>> for PatriciaMap<V> {
 }
 impl<V> From<PatriciaMap<V>> for Node<V> {
     fn from(f: PatriciaMap<V>) -> Self {
-        f.tree.into()
+        f.tree.into_root()
     }
 }
 impl<V> AsRef<Node<V>> for PatriciaMap<V> {
@@ -328,6 +338,25 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
             self.key.truncate(key_len);
             self.key.extend(node.label());
             if let Some(value) = node.value() {
+                return Some((self.key.clone(), value));
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug)]
+pub struct IntoIter<V> {
+    nodes: tree::IntoNodes<V>,
+    key: Vec<u8>,
+}
+impl<V> Iterator for IntoIter<V> {
+    type Item = (Vec<u8>, V);
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((key_len, mut node)) = self.nodes.next() {
+            self.key.truncate(key_len);
+            self.key.extend(node.label());
+            if let Some(value) = node.take_value() {
                 return Some((self.key.clone(), value));
             }
         }

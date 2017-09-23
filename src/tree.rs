@@ -1,4 +1,4 @@
-use node::Node;
+use node::{self, Node};
 
 #[derive(Debug, Clone)]
 pub struct PatriciaTree<V> {
@@ -11,6 +11,9 @@ impl<V> PatriciaTree<V> {
             root: Node::root(),
             len: 0,
         }
+    }
+    pub fn into_root(self) -> Node<V> {
+        self.root
     }
     pub fn root(&self) -> &Node<V> {
         &self.root
@@ -46,8 +49,14 @@ impl<V> PatriciaTree<V> {
     }
     pub fn nodes(&self) -> Nodes<V> {
         Nodes {
-            stack: vec![(0, self.root())],
-            key_len: 0,
+            nodes: self.root.iter(),
+            label_lens: Vec::new(),
+        }
+    }
+    pub fn into_nodes(self) -> IntoNodes<V> {
+        IntoNodes {
+            nodes: self.root.into_iter(),
+            label_lens: Vec::new(),
         }
     }
 }
@@ -64,32 +73,41 @@ impl<V> From<Node<V>> for PatriciaTree<V> {
         this
     }
 }
-impl<V> From<PatriciaTree<V>> for Node<V> {
-    fn from(f: PatriciaTree<V>) -> Self {
-        f.root
-    }
-}
 
 #[derive(Debug)]
 pub struct Nodes<'a, V: 'a> {
-    stack: Vec<(usize, &'a Node<V>)>,
-    key_len: usize,
+    nodes: node::Iter<'a, V>,
+    label_lens: Vec<usize>,
 }
 impl<'a, V: 'a> Iterator for Nodes<'a, V> {
     type Item = (usize, &'a Node<V>);
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((key_len, node)) = self.stack.pop() {
-            self.key_len = key_len;
-            if let Some(sibling) = node.sibling() {
-                self.stack.push((self.key_len, sibling));
-            }
+        if let Some((level, node)) = self.nodes.next() {
+            self.label_lens.resize(level + 1, 0);
+            self.label_lens[level] = node.label().len();
 
-            self.key_len += node.label().len();
-            if let Some(child) = node.child() {
-                self.stack.push((self.key_len, child));
-            }
+            let parent_key_len = self.label_lens.iter().take(level).sum();
+            Some((parent_key_len, node))
+        } else {
+            None
+        }
+    }
+}
 
-            Some((key_len, node))
+#[derive(Debug)]
+pub struct IntoNodes<V> {
+    nodes: node::IntoIter<V>,
+    label_lens: Vec<usize>,
+}
+impl<V> Iterator for IntoNodes<V> {
+    type Item = (usize, Node<V>);
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((level, node)) = self.nodes.next() {
+            self.label_lens.resize(level + 1, 0);
+            self.label_lens[level] = node.label().len();
+
+            let parent_key_len = self.label_lens.iter().take(level).sum();
+            Some((parent_key_len, node))
         } else {
             None
         }

@@ -319,7 +319,10 @@ impl<V> Node<V> {
             *self = node;
         }
     }
-    // TODO: iter, IntoIterator, FromIterator
+
+    pub fn iter(&self) -> Iter<V> {
+        Iter { stack: vec![(0, self)] }
+    }
 
     pub(crate) fn get(&self, key: &[u8]) -> Option<&V> {
         let common_prefix_len = self.skip_common_prefix(key);
@@ -532,5 +535,54 @@ impl<V: Clone> Clone for Node<V> {
         let child = self.child().cloned();
         let sibling = self.sibling().cloned();
         Node::new(label, value, child, sibling)
+    }
+}
+impl<V> IntoIterator for Node<V> {
+    type Item = (usize, Node<V>);
+    type IntoIter = IntoIter<V>;
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter { stack: vec![(0, self)] }
+    }
+}
+
+#[derive(Debug)]
+pub struct Iter<'a, V: 'a> {
+    stack: Vec<(usize, &'a Node<V>)>,
+}
+impl<'a, V: 'a> Iterator for Iter<'a, V> {
+    type Item = (usize, &'a Node<V>);
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((level, node)) = self.stack.pop() {
+            if let Some(sibling) = node.sibling() {
+                self.stack.push((level, sibling));
+            }
+            if let Some(child) = node.child() {
+                self.stack.push((level + 1, child));
+            }
+            Some((level, node))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct IntoIter<V> {
+    stack: Vec<(usize, Node<V>)>,
+}
+impl<V> Iterator for IntoIter<V> {
+    type Item = (usize, Node<V>);
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((level, mut node)) = self.stack.pop() {
+            if let Some(sibling) = node.take_sibling() {
+                self.stack.push((level, sibling));
+            }
+            if let Some(child) = node.take_child() {
+                self.stack.push((level + 1, child));
+            }
+            Some((level, node))
+        } else {
+            None
+        }
     }
 }

@@ -157,6 +157,13 @@ impl fmt::Debug for PatriciaSet {
         Ok(())
     }
 }
+impl IntoIterator for PatriciaSet {
+    type Item = Vec<u8>;
+    type IntoIter = IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter(self.map.into_iter())
+    }
+}
 impl<T: AsRef<[u8]>> FromIterator<T> for PatriciaSet {
     fn from_iter<I>(iter: I) -> Self
     where
@@ -201,6 +208,15 @@ impl<'a> Iterator for Iter<'a> {
     type Item = Vec<u8>;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
+    }
+}
+
+#[derive(Debug)]
+pub struct IntoIter(map::IntoIter<()>);
+impl Iterator for IntoIter {
+    type Item = Vec<u8>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|(k, _)| k)
     }
 }
 
