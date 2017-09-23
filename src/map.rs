@@ -20,12 +20,12 @@ impl<V> PatriciaMap<V> {
     /// let mut map = PatriciaMap::new();
     /// assert!(map.is_empty());
     ///
-    /// map.insert("foo".bytes(), 10);
+    /// map.insert("foo", 10);
     /// assert_eq!(map.len(), 1);
-    /// assert_eq!(map.get("foo".bytes()), Some(&10));
+    /// assert_eq!(map.get("foo"), Some(&10));
     ///
-    /// map.remove("foo".bytes());
-    /// assert_eq!(map.get("foo".bytes()), None);
+    /// map.remove("foo");
+    /// assert_eq!(map.get("foo"), None);
     /// ```
     pub fn new() -> Self {
         PatriciaMap { tree: PatriciaTree::new() }
@@ -39,7 +39,7 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let mut map = PatriciaMap::new();
-    /// map.insert("foo".bytes(), 1);
+    /// map.insert("foo", 1);
     /// map.clear();
     /// assert!(map.is_empty());
     /// ```
@@ -55,14 +55,11 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let mut map = PatriciaMap::new();
-    /// map.insert("foo".bytes(), 1);
-    /// assert!(map.contains_key("foo".bytes()));
-    /// assert!(!map.contains_key("bar".bytes()));
+    /// map.insert("foo", 1);
+    /// assert!(map.contains_key("foo"));
+    /// assert!(!map.contains_key("bar"));
     /// ```
-    pub fn contains_key<K>(&self, key: K) -> bool
-    where
-        K: Iterator<Item = u8>,
-    {
+    pub fn contains_key<K: AsRef<[u8]>>(&self, key: K) -> bool {
         self.tree.get(key).is_some()
     }
 
@@ -74,14 +71,11 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let mut map = PatriciaMap::new();
-    /// map.insert("foo".bytes(), 1);
-    /// assert_eq!(map.get("foo".bytes()), Some(&1));
-    /// assert_eq!(map.get("bar".bytes()), None);
+    /// map.insert("foo", 1);
+    /// assert_eq!(map.get("foo"), Some(&1));
+    /// assert_eq!(map.get("bar"), None);
     /// ```
-    pub fn get<K>(&self, key: K) -> Option<&V>
-    where
-        K: Iterator<Item = u8>,
-    {
+    pub fn get<K: AsRef<[u8]>>(&self, key: K) -> Option<&V> {
         self.tree.get(key)
     }
 
@@ -93,14 +87,11 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let mut map = PatriciaMap::new();
-    /// map.insert("foo".bytes(), 1);
-    /// map.get_mut("foo".bytes()).map(|v| *v = 2);
-    /// assert_eq!(map.get("foo".bytes()), Some(&2));
+    /// map.insert("foo", 1);
+    /// map.get_mut("foo").map(|v| *v = 2);
+    /// assert_eq!(map.get("foo"), Some(&2));
     /// ```
-    pub fn get_mut<K>(&mut self, key: K) -> Option<&mut V>
-    where
-        K: Iterator<Item = u8>,
-    {
+    pub fn get_mut<K: AsRef<[u8]>>(&mut self, key: K) -> Option<&mut V> {
         self.tree.get_mut(key)
     }
 
@@ -115,15 +106,12 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let mut map = PatriciaMap::new();
-    /// assert_eq!(map.insert("foo".bytes(), 1), None);
-    /// assert_eq!(map.get("foo".bytes()), Some(&1));
-    /// assert_eq!(map.insert("foo".bytes(), 2), Some(1));
-    /// assert_eq!(map.get("foo".bytes()), Some(&2));
+    /// assert_eq!(map.insert("foo", 1), None);
+    /// assert_eq!(map.get("foo"), Some(&1));
+    /// assert_eq!(map.insert("foo", 2), Some(1));
+    /// assert_eq!(map.get("foo"), Some(&2));
     /// ```
-    pub fn insert<K>(&mut self, key: K, value: V) -> Option<V>
-    where
-        K: Iterator<Item = u8>,
-    {
+    pub fn insert<K: AsRef<[u8]>>(&mut self, key: K, value: V) -> Option<V> {
         self.tree.insert(key, value)
     }
 
@@ -135,14 +123,11 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let mut map = PatriciaMap::new();
-    /// map.insert("foo".bytes(), 1);
-    /// assert_eq!(map.remove("foo".bytes()), Some(1));
-    /// assert_eq!(map.remove("foo".bytes()), None);
+    /// map.insert("foo", 1);
+    /// assert_eq!(map.remove("foo"), Some(1));
+    /// assert_eq!(map.remove("foo"), None);
     /// ```
-    pub fn remove<K>(&mut self, key: K) -> Option<V>
-    where
-        K: Iterator<Item = u8>,
-    {
+    pub fn remove<K: AsRef<[u8]>>(&mut self, key: K) -> Option<V> {
         self.tree.remove(key)
     }
 
@@ -154,8 +139,8 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let mut map = PatriciaMap::new();
-    /// map.insert("foo".bytes(), 1);
-    /// map.insert("bar".bytes(), 2);
+    /// map.insert("foo", 1);
+    /// map.insert("bar", 2);
     /// assert_eq!(map.len(), 2);
     /// ```
     pub fn len(&self) -> usize {
@@ -172,7 +157,7 @@ impl<V> PatriciaMap<V> {
     /// let mut map = PatriciaMap::new();
     /// assert!(map.is_empty());
     ///
-    /// map.insert("foo".bytes(), 1);
+    /// map.insert("foo", 1);
     /// assert!(!map.is_empty());
     ///
     /// map.clear();
@@ -191,7 +176,7 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let map: PatriciaMap<_> =
-    ///     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
+    ///     vec![("foo", 1), ("bar", 2), ("baz", 3)].into_iter().collect();
     /// assert_eq!(vec![(Vec::from("bar"), &2), ("baz".into(), &3), ("foo".into(), &1)],
     ///            map.iter().collect::<Vec<_>>());
     /// ```
@@ -210,11 +195,11 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let mut map: PatriciaMap<_> =
-    ///     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
+    ///     vec![("foo", 1), ("bar", 2), ("baz", 3)].into_iter().collect();
     /// for (_, v) in map.iter_mut() {
     ///    *v += 10;
     /// }
-    /// assert_eq!(map.get("bar".bytes()), Some(&12));
+    /// assert_eq!(map.get("bar"), Some(&12));
     /// ```
     pub fn iter_mut(&mut self) -> IterMut<V> {
         IterMut {
@@ -231,7 +216,7 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let map: PatriciaMap<_> =
-    ///     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
+    ///     vec![("foo", 1), ("bar", 2), ("baz", 3)].into_iter().collect();
     /// assert_eq!(vec![Vec::from("bar"), "baz".into(), "foo".into()],
     ///            map.keys().collect::<Vec<_>>());
     /// ```
@@ -247,7 +232,7 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let map: PatriciaMap<_> =
-    ///     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
+    ///     vec![("foo", 1), ("bar", 2), ("baz", 3)].into_iter().collect();
     /// assert_eq!(vec![2, 3, 1],
     ///            map.values().cloned().collect::<Vec<_>>());
     /// ```
@@ -263,7 +248,7 @@ impl<V> PatriciaMap<V> {
     /// use patricia_tree::PatriciaMap;
     ///
     /// let mut map: PatriciaMap<_> =
-    ///     vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)].into_iter().collect();
+    ///     vec![("foo", 1), ("bar", 2), ("baz", 3)].into_iter().collect();
     /// for v in map.values_mut() {
     ///     *v += 10;
     /// }
@@ -289,7 +274,7 @@ impl<V: fmt::Debug> fmt::Debug for PatriciaMap<V> {
 }
 impl<K, V> FromIterator<(K, V)> for PatriciaMap<V>
 where
-    K: Iterator<Item = u8>,
+    K: AsRef<[u8]>,
 {
     fn from_iter<I>(iter: I) -> Self
     where
@@ -304,7 +289,7 @@ where
 }
 impl<K, V> Extend<(K, V)> for PatriciaMap<V>
 where
-    K: Iterator<Item = u8>,
+    K: AsRef<[u8]>,
 {
     fn extend<I>(&mut self, iter: I)
     where
@@ -421,7 +406,7 @@ mod test {
 
     #[test]
     fn debug_works() {
-        let map: PatriciaMap<_> = vec![("foo".bytes(), 1), ("bar".bytes(), 2), ("baz".bytes(), 3)]
+        let map: PatriciaMap<_> = vec![("foo", 1), ("bar", 2), ("baz", 3)]
             .into_iter()
             .collect();
         assert_eq!(

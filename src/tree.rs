@@ -15,34 +15,22 @@ impl<V> PatriciaTree<V> {
     pub fn root(&self) -> &Node<V> {
         &self.root
     }
-    pub fn insert<K>(&mut self, key: K, value: V) -> Option<V>
-    where
-        K: Iterator<Item = u8>,
-    {
-        if let Some(old) = self.root.insert(key.peekable(), value) {
+    pub fn insert<K: AsRef<[u8]>>(&mut self, key: K, value: V) -> Option<V> {
+        if let Some(old) = self.root.insert(key.as_ref(), value) {
             Some(old)
         } else {
             self.len += 1;
             None
         }
     }
-    pub fn get<K>(&self, key: K) -> Option<&V>
-    where
-        K: Iterator<Item = u8>,
-    {
-        self.root.get(key.peekable())
+    pub fn get<K: AsRef<[u8]>>(&self, key: K) -> Option<&V> {
+        self.root.get(key.as_ref())
     }
-    pub fn get_mut<K>(&mut self, key: K) -> Option<&mut V>
-    where
-        K: Iterator<Item = u8>,
-    {
-        self.root.get_mut(key.peekable())
+    pub fn get_mut<K: AsRef<[u8]>>(&mut self, key: K) -> Option<&mut V> {
+        self.root.get_mut(key.as_ref())
     }
-    pub fn remove<K>(&mut self, key: K) -> Option<V>
-    where
-        K: Iterator<Item = u8>,
-    {
-        if let Some(old) = self.root.remove(key.peekable()) {
+    pub fn remove<K: AsRef<[u8]>>(&mut self, key: K) -> Option<V> {
+        if let Some(old) = self.root.remove(key.as_ref()) {
             self.len -= 1;
             Some(old)
         } else {
@@ -115,52 +103,52 @@ mod test {
     #[test]
     fn it_works() {
         let mut tree = PatriciaTree::new();
-        assert_eq!(tree.insert("".bytes(), 1), None);
-        assert_eq!(tree.insert("".bytes(), 2), Some(1));
+        assert_eq!(tree.insert("", 1), None);
+        assert_eq!(tree.insert("", 2), Some(1));
 
-        assert_eq!(tree.insert("foo".bytes(), 3), None);
-        assert_eq!(tree.insert("foo".bytes(), 4), Some(3));
+        assert_eq!(tree.insert("foo", 3), None);
+        assert_eq!(tree.insert("foo", 4), Some(3));
 
-        assert_eq!(tree.insert("foobar".bytes(), 5), None);
+        assert_eq!(tree.insert("foobar", 5), None);
 
-        assert_eq!(tree.insert("bar".bytes(), 6), None);
-        assert_eq!(tree.insert("baz".bytes(), 7), None);
+        assert_eq!(tree.insert("bar", 6), None);
+        assert_eq!(tree.insert("baz", 7), None);
 
-        assert_eq!(tree.insert("bar".bytes(), 7), Some(6));
-        assert_eq!(tree.insert("baz".bytes(), 8), Some(7));
+        assert_eq!(tree.insert("bar", 7), Some(6));
+        assert_eq!(tree.insert("baz", 8), Some(7));
 
-        assert_eq!(tree.get("".bytes()), Some(&2));
-        assert_eq!(tree.get("foo".bytes()), Some(&4));
-        assert_eq!(tree.get("foobar".bytes()), Some(&5));
-        assert_eq!(tree.get("bar".bytes()), Some(&7));
-        assert_eq!(tree.get("baz".bytes()), Some(&8));
-        assert_eq!(tree.get("qux".bytes()), None);
+        assert_eq!(tree.get(""), Some(&2));
+        assert_eq!(tree.get("foo"), Some(&4));
+        assert_eq!(tree.get("foobar"), Some(&5));
+        assert_eq!(tree.get("bar"), Some(&7));
+        assert_eq!(tree.get("baz"), Some(&8));
+        assert_eq!(tree.get("qux"), None);
 
         let tree2 = tree.clone();
-        assert_eq!(tree2.get("".bytes()), Some(&2));
-        assert_eq!(tree2.get("foo".bytes()), Some(&4));
-        assert_eq!(tree2.get("foobar".bytes()), Some(&5));
-        assert_eq!(tree2.get("bar".bytes()), Some(&7));
-        assert_eq!(tree2.get("baz".bytes()), Some(&8));
+        assert_eq!(tree2.get(""), Some(&2));
+        assert_eq!(tree2.get("foo"), Some(&4));
+        assert_eq!(tree2.get("foobar"), Some(&5));
+        assert_eq!(tree2.get("bar"), Some(&7));
+        assert_eq!(tree2.get("baz"), Some(&8));
 
-        assert_eq!(tree.remove("".bytes()), Some(2));
-        assert_eq!(tree.remove("foo".bytes()), Some(4));
-        assert_eq!(tree.remove("foobar".bytes()), Some(5));
-        assert_eq!(tree.remove("bar".bytes()), Some(7));
-        assert_eq!(tree.remove("baz".bytes()), Some(8));
-        assert_eq!(tree.remove("qux".bytes()), None);
+        assert_eq!(tree.remove(""), Some(2));
+        assert_eq!(tree.remove("foo"), Some(4));
+        assert_eq!(tree.remove("foobar"), Some(5));
+        assert_eq!(tree.remove("bar"), Some(7));
+        assert_eq!(tree.remove("baz"), Some(8));
+        assert_eq!(tree.remove("qux"), None);
 
-        assert_eq!(tree.get("".bytes()), None);
-        assert_eq!(tree.get("foo".bytes()), None);
-        assert_eq!(tree.get("foobar".bytes()), None);
-        assert_eq!(tree.get("bar".bytes()), None);
-        assert_eq!(tree.get("baz".bytes()), None);
-        assert_eq!(tree.get("qux".bytes()), None);
+        assert_eq!(tree.get(""), None);
+        assert_eq!(tree.get("foo"), None);
+        assert_eq!(tree.get("foobar"), None);
+        assert_eq!(tree.get("bar"), None);
+        assert_eq!(tree.get("baz"), None);
+        assert_eq!(tree.get("qux"), None);
 
-        assert_eq!(tree2.get("".bytes()), Some(&2));
-        assert_eq!(tree2.get("foo".bytes()), Some(&4));
-        assert_eq!(tree2.get("foobar".bytes()), Some(&5));
-        assert_eq!(tree2.get("bar".bytes()), Some(&7));
-        assert_eq!(tree2.get("baz".bytes()), Some(&8));
+        assert_eq!(tree2.get(""), Some(&2));
+        assert_eq!(tree2.get("foo"), Some(&4));
+        assert_eq!(tree2.get("foobar"), Some(&5));
+        assert_eq!(tree2.get("bar"), Some(&7));
+        assert_eq!(tree2.get("baz"), Some(&8));
     }
 }

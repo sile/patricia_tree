@@ -31,8 +31,8 @@ impl PatriciaSet {
     /// use patricia_tree::PatriciaSet;
     ///
     /// let mut set = PatriciaSet::new();
-    /// set.insert("foo".bytes());
-    /// set.insert("bar".bytes());
+    /// set.insert("foo");
+    /// set.insert("bar");
     /// assert_eq!(set.len(), 2);
     /// ```
     pub fn len(&self) -> usize {
@@ -49,7 +49,7 @@ impl PatriciaSet {
     /// let mut set = PatriciaSet::new();
     /// assert!(set.is_empty());
     ///
-    /// set.insert("foo".bytes());
+    /// set.insert("foo");
     /// assert!(!set.is_empty());
     ///
     /// set.clear();
@@ -67,7 +67,7 @@ impl PatriciaSet {
     /// use patricia_tree::PatriciaSet;
     ///
     /// let mut set = PatriciaSet::new();
-    /// set.insert("foo".bytes());
+    /// set.insert("foo");
     /// set.clear();
     /// assert!(set.is_empty());
     /// ```
@@ -83,14 +83,11 @@ impl PatriciaSet {
     /// use patricia_tree::PatriciaSet;
     ///
     /// let mut set = PatriciaSet::new();
-    /// set.insert("foo".bytes());
-    /// assert!(set.contains("foo".bytes()));
-    /// assert!(!set.contains("bar".bytes()));
+    /// set.insert("foo");
+    /// assert!(set.contains("foo"));
+    /// assert!(!set.contains("bar"));
     /// ```
-    pub fn contains<T>(&self, value: T) -> bool
-    where
-        T: Iterator<Item = u8>,
-    {
+    pub fn contains<T: AsRef<[u8]>>(&self, value: T) -> bool {
         self.map.get(value).is_some()
     }
 
@@ -105,14 +102,11 @@ impl PatriciaSet {
     /// use patricia_tree::PatriciaSet;
     ///
     /// let mut set = PatriciaSet::new();
-    /// assert!(set.insert("foo".bytes()));
-    /// assert!(!set.insert("foo".bytes()));
+    /// assert!(set.insert("foo"));
+    /// assert!(!set.insert("foo"));
     /// assert_eq!(set.len(), 1);
     /// ```
-    pub fn insert<T>(&mut self, value: T) -> bool
-    where
-        T: Iterator<Item = u8>,
-    {
+    pub fn insert<T: AsRef<[u8]>>(&mut self, value: T) -> bool {
         self.map.insert(value, ()).is_none()
     }
 
@@ -124,14 +118,11 @@ impl PatriciaSet {
     /// use patricia_tree::PatriciaSet;
     ///
     /// let mut set = PatriciaSet::new();
-    /// set.insert("foo".bytes());
-    /// assert_eq!(set.remove("foo".bytes()), true);
-    /// assert_eq!(set.remove("foo".bytes()), false);
+    /// set.insert("foo");
+    /// assert_eq!(set.remove("foo"), true);
+    /// assert_eq!(set.remove("foo"), false);
     /// ```
-    pub fn remove<T>(&mut self, value: T) -> bool
-    where
-        T: Iterator<Item = u8>,
-    {
+    pub fn remove<T: AsRef<[u8]>>(&mut self, value: T) -> bool {
         self.map.remove(value).is_some()
     }
 
@@ -143,9 +134,9 @@ impl PatriciaSet {
     /// use patricia_tree::PatriciaSet;
     ///
     /// let mut set = PatriciaSet::new();
-    /// set.insert("foo".bytes());
-    /// set.insert("bar".bytes());
-    /// set.insert("baz".bytes());
+    /// set.insert("foo");
+    /// set.insert("bar");
+    /// set.insert("baz");
     ///
     /// assert_eq!(set.iter().collect::<Vec<_>>(), [Vec::from("bar"), "baz".into(), "foo".into()]);
     /// ```
@@ -166,10 +157,7 @@ impl fmt::Debug for PatriciaSet {
         Ok(())
     }
 }
-impl<T> FromIterator<T> for PatriciaSet
-where
-    T: Iterator<Item = u8>,
-{
+impl<T: AsRef<[u8]>> FromIterator<T> for PatriciaSet {
     fn from_iter<I>(iter: I) -> Self
     where
         I: IntoIterator<Item = T>,
@@ -181,10 +169,7 @@ where
         set
     }
 }
-impl<T> Extend<T> for PatriciaSet
-where
-    T: Iterator<Item = u8>,
-{
+impl<T: AsRef<[u8]>> Extend<T> for PatriciaSet {
     fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = T>,
@@ -225,9 +210,7 @@ mod test {
 
     #[test]
     fn debug_works() {
-        let set: PatriciaSet = vec!["foo".bytes(), "bar".bytes(), "baz".bytes()]
-            .into_iter()
-            .collect();
+        let set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
         assert_eq!(
             format!("{:?}", set),
             "{[98, 97, 114], [98, 97, 122], [102, 111, 111]}"
