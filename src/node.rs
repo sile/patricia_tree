@@ -235,6 +235,7 @@ impl<V> Node<V> {
 
     /// Sets the value of this node.
     pub fn set_value(&mut self, value: V) {
+        self.take_value();
         if let Some(offset) = self.value_offset() {
             self.set_flags(Flags::VALUE_INITIALIZED, true);
             unsafe { ptr::write(self.ptr.offset(offset) as _, value) };
@@ -248,6 +249,7 @@ impl<V> Node<V> {
 
     /// Sets the child of this node.
     pub fn set_child(&mut self, child: Self) {
+        self.take_child();
         if let Some(offset) = self.child_offset() {
             self.set_flags(Flags::CHILD_INITIALIZED, true);
             unsafe { ptr::write(self.ptr.offset(offset) as _, child) };
@@ -261,6 +263,7 @@ impl<V> Node<V> {
 
     /// Sets the sibling of this node.
     pub fn set_sibling(&mut self, sibling: Self) {
+        self.take_sibling();
         if let Some(offset) = self.sibling_offset() {
             self.set_flags(Flags::SIBLING_INITIALIZED, true);
             unsafe { ptr::write(self.ptr.offset(offset) as _, sibling) };
@@ -352,46 +355,37 @@ impl<V> Node<V> {
     where
         K: Iterator<Item = u8>,
     {
-        // TODO: optimize
-        if let Some(common_prefix_len) = self.skip_common_prefix(&mut key) {
+        if self.label().get(0).map_or(false, |b| Some(b) > key.peek()) {
+            let this = Node {
+                ptr: self.ptr,
+                _value: PhantomData,
+            };
+            let node = Node::new_with_peekable(key, Some(value), None, Some(this));
+            self.ptr = node.ptr;
+            mem::forget(node);
+            None
+        } else if let Some(common_prefix_len) = self.skip_common_prefix(&mut key) {
             if common_prefix_len == 0 {
-                if let Some(mut sibling) = self.take_sibling() {
-                    if key.peek() < sibling.label().get(0) {
-                        let sibling = Node::new(key, Some(value), None, Some(sibling));
-                        self.set_sibling(sibling);
-                        None
-                    } else {
-                        let old = sibling.insert(key, value);
-                        self.set_sibling(sibling);
-                        old
-                    }
-                } else {
-                    let sibling = Node::new(key, Some(value), None, None);
-                    self.set_sibling(sibling);
-                    None
+                if let Some(sibling) = self.sibling_mut() {
+                    return sibling.insert(key, value);
                 }
+                let sibling = Node::new_with_peekable(key, Some(value), None, None);
+                self.set_sibling(sibling);
+                None
             } else {
-                let mut child = self.split_at(common_prefix_len);
-                child.insert(key, value);
-                self.set_child(child);
+                self.split_at(common_prefix_len);
+                assert_some!(self.child_mut()).insert(key, value);
                 None
             }
         } else if key.peek().is_none() {
             let old = self.take_value();
             self.set_value(value);
             old
-        } else if let Some(mut child) = self.take_child() {
-            if key.peek() < child.label().get(0) {
-                let child = Node::new(key, Some(value), None, Some(child));
-                self.set_child(child);
-                None
-            } else {
-                let old = child.insert(key, value);
-                self.set_child(child);
-                old
-            }
         } else {
-            let child = Node::new(key, Some(value), None, None);
+            if let Some(child) = self.child_mut() {
+                return child.insert(key, value);
+            }
+            let child = Node::new_with_peekable(key, Some(value), None, None);
             self.set_child(child);
             None
         }
@@ -464,8 +458,7 @@ impl<V> Node<V> {
     fn flags(&self) -> Flags {
         Flags::from_bits_truncate(unsafe { *self.ptr })
     }
-    // TODO: flags_mut
-    fn set_flags(&self, other: Flags, value: bool) {
+    fn set_flags(&mut self, other: Flags, value: bool) {
         let mut flags = self.flags();
         flags.set(other, value);
         unsafe { ptr::write(self.ptr, flags.bits() as u8) };
@@ -508,27 +501,25 @@ impl<V> Node<V> {
             None
         }
     }
-    // TODO
-    fn split_at(&mut self, position: usize) -> Self {
+    fn split_at(&mut self, position: usize) {
         debug_assert!(position < self.label_len());
         let value = self.take_value();
         let child = self.take_child();
         let sibling = self.take_sibling();
 
-        let parent = Node::new(
-            self.label().iter().take(position).cloned(),
-            None,
-            None,
-            sibling,
-        );
         let child = Node::new(
             self.label().iter().skip(position).cloned(),
             value,
             child,
             None,
         );
+        let parent = Node::new(
+            self.label().iter().take(position).cloned(),
+            None,
+            Some(child),
+            sibling,
+        );
         *self = parent;
-        child
     }
     fn try_reclaim_sibling(&mut self) {
         let flags = assert_some!(self.sibling()).flags();
