@@ -9,7 +9,7 @@ patricia_tree
 
 Memory-efficient data structures based on patricia tree (a.k.a, radix tree).
 
-[Documentation](https://docs.rs/patricia_tree).
+[Documentation](https://docs.rs/patricia_tree)
 
 A common prefixes of the keys in a patricia tree are represented by a shared path.
 So if the prefixes of the key set is highly redundant,
@@ -33,13 +33,13 @@ assert_eq!(map.get("foo"), Some(&1));
 assert_eq!(map.get("bar"), Some(&2));
 assert_eq!(map.get("baz"), Some(&3));
 ```
+
 Benchmarks
 -----------
 
 ```console
 $ cargo run --example insert_lines --release -- --version 2> /dev/null
 insert_lines 0.1.0
-
 
 ///
 /// INPUT: Wikipedia
@@ -65,7 +65,6 @@ $ /usr/bin/time -f "# ELAPSED: %E\n# MEMORY: %M" cargo run --example insert_line
 # LINES: 13450823
 # ELAPSED: 1:12.55
 # MEMORY: 434340   // 424 MB
-
 
 ///
 /// INPUT: Google 5-gram
