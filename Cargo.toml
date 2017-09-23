@@ -2,6 +2,17 @@
 name = "patricia_tree"
 version = "0.1.0"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
+description = "Memory-efficient data structures based on patricia tree"
+homepage = "https://github.com/sile/patricia_tree"
+repository = "https://github.com/sile/patricia_tree"
+readme = "README.md"
+keywords = ["patricia", "radix", "trie"]
+categories = ["data-structures"]
+license = "MIT"
+
+[badges]
+travis-ci = { repository = "sile/patricia_tree" }
+codecov = { repository = "sile/patricia_tree" }
 
 [dependencies]
 bitflags = "1"
