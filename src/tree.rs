@@ -96,7 +96,7 @@ impl<'a, V: 'a> Iterator for Nodes<'a, V> {
                 self.stack.push((self.key_len, sibling));
             }
 
-            self.key_len += node.key().len();
+            self.key_len += node.label().len();
             if let Some(child) = node.child() {
                 self.stack.push((self.key_len, child));
             }

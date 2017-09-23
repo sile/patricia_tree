@@ -62,7 +62,6 @@ impl<V> PatriciaMap<V> {
     where
         K: Iterator<Item = u8>,
     {
-        // TODO: optimize
         self.tree.get(key).is_some()
     }
 
@@ -341,7 +340,7 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((key_len, node)) = self.nodes.next() {
             self.key.truncate(key_len);
-            self.key.extend(node.key());
+            self.key.extend(node.label());
             if let Some(value) = node.value() {
                 return Some((self.key.clone(), value));
             }
@@ -360,8 +359,8 @@ impl<'a, V: 'a> Iterator for IterMut<'a, V> {
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((key_len, node)) = self.nodes.next() {
             self.key.truncate(key_len);
-            self.key.extend(node.key());
-            if let Some(value) = node.value_mut() {
+            self.key.extend(node.label());
+            if let Some(value) = unsafe { node.value_mut() } {
                 return Some((self.key.clone(), value));
             }
         }
@@ -402,7 +401,7 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
     type Item = &'a mut V;
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((_, node)) = self.nodes.next() {
-            if let Some(value) = node.value_mut() {
+            if let Some(value) = unsafe { node.value_mut() } {
                 return Some(value);
             }
         }
