@@ -8,4 +8,5 @@ bitflags = "1"
 libc = "0.2"
 
 [dev-dependencies]
+clap = "2"
 rand = "0.3"
