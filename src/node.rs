@@ -384,20 +384,26 @@ impl<V> Node<V> {
         let next = &key[common_prefix_len..];
         if common_prefix_len == self.label().len() {
             if next.is_empty() {
-                self.take_value()
+                self.take_value().map(|old| {
+                    self.try_merge_with_child();
+                    old
+                })
             } else {
-                let result = self.child_mut().and_then(|child| child.remove(next));
-                if result.is_some() {
-                    self.try_reclaim_child();
-                }
-                result
+                self.child_mut().and_then(|child| child.remove(next)).map(
+                    |old| {
+                        self.try_reclaim_child();
+                        self.try_merge_with_child();
+                        old
+                    },
+                )
             }
         } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
-            let result = self.sibling_mut().and_then(|sibling| sibling.remove(next));
-            if result.is_some() {
-                self.try_reclaim_sibling();
-            }
-            result
+            self.sibling_mut()
+                .and_then(|sibling| sibling.remove(next))
+                .map(|old| {
+                    self.try_reclaim_sibling();
+                    old
+                })
         } else {
             None
         }
@@ -522,17 +528,22 @@ impl<V> Node<V> {
     }
     fn try_reclaim_child(&mut self) {
         let flags = assert_some!(self.child()).flags();
-        if !flags.intersects(Flags::VALUE_INITIALIZED | Flags::CHILD_INITIALIZED) {
-            if let Some(child) = self.take_child().and_then(|mut n| n.take_sibling()) {
-                self.set_child(child);
-            } else {
-                return;
-            }
+        if flags.intersects(Flags::VALUE_INITIALIZED | Flags::CHILD_INITIALIZED) {
+            return;
+        }
+        if let Some(child) = self.take_child().and_then(|mut n| n.take_sibling()) {
+            self.set_child(child);
+        }
+    }
+    fn try_merge_with_child(&mut self) {
+        if self.flags().contains(Flags::VALUE_INITIALIZED) ||
+            !self.flags().contains(Flags::CHILD_INITIALIZED)
+        {
+            return;
         }
 
         let flags = assert_some!(self.child()).flags();
-        if !self.flags().contains(Flags::VALUE_INITIALIZED) &&
-            !flags.contains(Flags::SIBLING_INITIALIZED) &&
+        if !flags.contains(Flags::SIBLING_INITIALIZED) &&
             (self.label_len() + assert_some!(self.child()).label_len()) <= MAX_LABEL_LEN
         {
             let mut child = assert_some!(self.take_child());
@@ -625,6 +636,9 @@ impl<V> Iterator for IntoIter<V> {
 
 #[cfg(test)]
 mod test {
+    use std::str;
+
+    use PatriciaSet;
     use super::*;
 
     #[test]
@@ -637,5 +651,32 @@ mod test {
         let child = node.child().unwrap();
         assert_eq!(child.label(), b"a");
         assert_eq!(child.value(), Some(&10));
+    }
+
+    #[test]
+    fn reclaim_works() {
+        let mut set = ["123", "123456", "123abc", "123def"]
+            .iter()
+            .collect::<PatriciaSet>();
+        assert_eq!(
+            set_to_labels(&set),
+            [(0, ""), (1, "123"), (2, "456"), (2, "abc"), (2, "def")]
+        );
+
+        set.remove("123def");
+        assert_eq!(set_to_labels(&set), [(0, "123"), (1, "456"), (1, "abc")]);
+
+        set.remove("123456");
+        assert_eq!(set_to_labels(&set), [(0, "123"), (1, "abc")]);
+
+        set.remove("123");
+        assert_eq!(set_to_labels(&set), [(0, "123abc")]);
+    }
+
+    fn set_to_labels(set: &PatriciaSet) -> Vec<(usize, &str)> {
+        set.as_ref()
+            .iter()
+            .map(|(level, n)| (level, str::from_utf8(n.label()).unwrap()))
+            .collect()
     }
 }
