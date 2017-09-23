@@ -15,6 +15,7 @@ A common prefixes of the keys in a patricia tree are represented by a shared pat
 So if the prefixes of the key set is highly redundant,
 the memory usage of the resulting patricia tree will be drastically less than
 more generic data structures (e.g., `BTreeMap`).
+
 See [Radix tree](https://en.wikipedia.org/wiki/Radix_tree) for more details.
 
 Examples
