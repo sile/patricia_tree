@@ -1,5 +1,6 @@
 use std::fmt;
 use std::iter::FromIterator;
+use std::mem;
 
 use node::Node;
 use tree::{self, PatriciaTree};
@@ -356,11 +357,14 @@ pub struct IterMut<'a, V: 'a> {
 }
 impl<'a, V: 'a> Iterator for IterMut<'a, V> {
     type Item = (Vec<u8>, &'a mut V);
+    #[allow(mutable_transmutes)]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((key_len, node)) = self.nodes.next() {
             self.key.truncate(key_len);
             self.key.extend(node.label());
-            if let Some(value) = unsafe { node.value_mut() } {
+
+            let node = unsafe { mem::transmute::<_, &'a mut Node<V>>(node) };
+            if let Some(value) = node.value_mut() {
                 return Some((self.key.clone(), value));
             }
         }
@@ -399,9 +403,11 @@ pub struct ValuesMut<'a, V: 'a> {
 }
 impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
     type Item = &'a mut V;
+    #[allow(mutable_transmutes)]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((_, node)) = self.nodes.next() {
-            if let Some(value) = unsafe { node.value_mut() } {
+            let node = unsafe { mem::transmute::<_, &'a mut Node<V>>(node) };
+            if let Some(value) = node.value_mut() {
                 return Some(value);
             }
         }

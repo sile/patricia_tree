@@ -115,11 +115,13 @@ impl<V> Node<V> {
     }
 
     /// Returns the mutable reference to the value of this node.
-    pub unsafe fn value_mut(&self) -> Option<&mut V> {
+    pub fn value_mut(&mut self) -> Option<&mut V> {
         if let Some(offset) = self.value_offset() {
             if self.flags().contains(Flags::VALUE_INITIALIZED) {
-                let value = self.ptr.offset(offset) as *mut V;
-                return Some(&mut *value);
+                unsafe {
+                    let value = self.ptr.offset(offset) as *mut V;
+                    return Some(&mut *value);
+                }
             }
         }
         None
@@ -139,11 +141,13 @@ impl<V> Node<V> {
     }
 
     /// Returns the mutable reference to the child of this node.
-    pub unsafe fn child_mut(&self) -> Option<&mut Self> {
+    pub fn child_mut(&mut self) -> Option<&mut Self> {
         if let Some(offset) = self.child_offset() {
             if self.flags().contains(Flags::CHILD_INITIALIZED) {
-                let child = self.ptr.offset(offset) as *mut Self;
-                return Some(&mut *child);
+                unsafe {
+                    let child = self.ptr.offset(offset) as *mut Self;
+                    return Some(&mut *child);
+                }
             }
         }
         None
@@ -163,11 +167,13 @@ impl<V> Node<V> {
     }
 
     /// Returns the mutable reference to the sibling of this node.
-    pub unsafe fn sibling_mut(&self) -> Option<&mut Self> {
+    pub fn sibling_mut(&mut self) -> Option<&mut Self> {
         if let Some(offset) = self.sibling_offset() {
             if self.flags().contains(Flags::SIBLING_INITIALIZED) {
-                let sibling = self.ptr.offset(offset) as *mut Self;
-                return Some(&mut *sibling);
+                unsafe {
+                    let sibling = self.ptr.offset(offset) as *mut Self;
+                    return Some(&mut *sibling);
+                }
             }
         }
         None
@@ -294,14 +300,14 @@ impl<V> Node<V> {
             None
         } else if let Some(common_prefix_len) = self.skip_common_prefix(&mut key) {
             if common_prefix_len == 0 {
-                unsafe { self.sibling_mut() }.and_then(|sibling| sibling.get_mut(key))
+                self.sibling_mut().and_then(|sibling| sibling.get_mut(key))
             } else {
                 None
             }
         } else if key.peek().is_none() {
-            unsafe { self.value_mut() }
+            self.value_mut()
         } else {
-            unsafe { self.child_mut() }.and_then(|child| child.get_mut(key))
+            self.child_mut().and_then(|child| child.get_mut(key))
         }
     }
     // TODO: 不要となったノードの削除・回収
@@ -313,14 +319,14 @@ impl<V> Node<V> {
             None
         } else if let Some(common_prefix_len) = self.skip_common_prefix(&mut key) {
             if common_prefix_len == 0 {
-                unsafe { self.sibling_mut() }.and_then(|sibling| sibling.remove(key))
+                self.sibling_mut().and_then(|sibling| sibling.remove(key))
             } else {
                 None
             }
         } else if key.peek().is_none() {
             self.take_value()
         } else {
-            unsafe { self.child_mut() }.and_then(|child| child.remove(key))
+            self.child_mut().and_then(|child| child.remove(key))
         }
     }
     pub(crate) fn insert<K>(&mut self, mut key: Peekable<K>, value: V) -> Option<V>
