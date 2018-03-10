@@ -95,6 +95,31 @@ impl PatriciaSet {
         self.map.get(value).is_some()
     }
 
+    /// Finds the longest common prefix of `value` and the elements in this set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaSet;
+    ///
+    /// let mut set = PatriciaSet::new();
+    /// set.insert("foo");
+    /// set.insert("foobar");
+    /// assert_eq!(set.get_longest_common_prefix("fo"), None);
+    /// assert_eq!(set.get_longest_common_prefix("foo"), Some("foo".as_bytes()));
+    /// assert_eq!(set.get_longest_common_prefix("fooba"), Some("foo".as_bytes()));
+    /// assert_eq!(set.get_longest_common_prefix("foobar"), Some("foobar".as_bytes()));
+    /// assert_eq!(set.get_longest_common_prefix("foobarbaz"), Some("foobar".as_bytes()));
+    /// ```
+    pub fn get_longest_common_prefix<'a, T>(&self, value: &'a T) -> Option<&'a [u8]>
+    where
+        T: AsRef<[u8]> + ?Sized,
+    {
+        self.map
+            .get_longest_common_prefix(value.as_ref())
+            .map(|x| x.0)
+    }
+
     /// Adds a value to this set.
     ///
     /// If the set did not have this value present, `true` is returned.

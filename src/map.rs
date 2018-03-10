@@ -99,6 +99,30 @@ impl<V> PatriciaMap<V> {
         self.tree.get_mut(key)
     }
 
+    /// Finds the longest common prefix of `key` and the keys in this map,
+    /// and returns a reference to the entry whose key matches the prefix.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map = PatriciaMap::new();
+    /// map.insert("foo", 1);
+    /// map.insert("foobar", 2);
+    /// assert_eq!(map.get_longest_common_prefix("fo"), None);
+    /// assert_eq!(map.get_longest_common_prefix("foo"), Some(("foo".as_bytes(), &1)));
+    /// assert_eq!(map.get_longest_common_prefix("fooba"), Some(("foo".as_bytes(), &1)));
+    /// assert_eq!(map.get_longest_common_prefix("foobar"), Some(("foobar".as_bytes(), &2)));
+    /// assert_eq!(map.get_longest_common_prefix("foobarbaz"), Some(("foobar".as_bytes(), &2)));
+    /// ```
+    pub fn get_longest_common_prefix<'a, K>(&self, key: &'a K) -> Option<(&'a [u8], &V)>
+    where
+        K: AsRef<[u8]> + ?Sized,
+    {
+        self.tree.get_longest_common_prefix(key.as_ref())
+    }
+
     /// Inserts a key-value pair into this map.
     ///
     /// If the map did not have this key present, `None` is returned.

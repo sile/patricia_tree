@@ -32,6 +32,11 @@ impl<V> PatriciaTree<V> {
     pub fn get_mut<K: AsRef<[u8]>>(&mut self, key: K) -> Option<&mut V> {
         self.root.get_mut(key.as_ref())
     }
+    pub fn get_longest_common_prefix<'a>(&self, key: &'a [u8]) -> Option<(&'a [u8], &V)> {
+        self.root
+            .get_longest_common_prefix(key, 0)
+            .map(|(n, v)| (&key[..n], v))
+    }
     pub fn remove<K: AsRef<[u8]>>(&mut self, key: K) -> Option<V> {
         if let Some(old) = self.root.remove(key.as_ref()) {
             self.len -= 1;
