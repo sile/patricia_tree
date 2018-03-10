@@ -7,7 +7,7 @@ use node::Node;
 use tree::{self, PatriciaTree};
 
 /// A map based on a patricia tree.
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct PatriciaMap<V> {
     tree: PatriciaTree<V>,
 }
@@ -277,6 +277,11 @@ impl<V: fmt::Debug> fmt::Debug for PatriciaMap<V> {
         }
         write!(f, "}}")?;
         Ok(())
+    }
+}
+impl<V> Default for PatriciaMap<V> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 impl<V> IntoIterator for PatriciaMap<V> {
