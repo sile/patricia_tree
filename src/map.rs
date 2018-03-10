@@ -30,7 +30,9 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(map.get("foo"), None);
     /// ```
     pub fn new() -> Self {
-        PatriciaMap { tree: PatriciaTree::new() }
+        PatriciaMap {
+            tree: PatriciaTree::new(),
+        }
     }
 
     /// Clears this map, removing all values.
@@ -169,7 +171,6 @@ impl<V> PatriciaMap<V> {
         self.len() == 0
     }
 
-
     /// Gets an iterator over the entries of this map, sorted by key.
     ///
     /// # Examples
@@ -239,7 +240,9 @@ impl<V> PatriciaMap<V> {
     ///            map.values().cloned().collect::<Vec<_>>());
     /// ```
     pub fn values(&self) -> Values<V> {
-        Values { nodes: self.tree.nodes() }
+        Values {
+            nodes: self.tree.nodes(),
+        }
     }
 
     /// Gets a mutable iterator over the values of this map, in order by key.
@@ -258,7 +261,9 @@ impl<V> PatriciaMap<V> {
     ///            map.values().cloned().collect::<Vec<_>>());
     /// ```
     pub fn values_mut(&mut self) -> ValuesMut<V> {
-        ValuesMut { nodes: self.tree.nodes() }
+        ValuesMut {
+            nodes: self.tree.nodes(),
+        }
     }
 }
 impl<V: fmt::Debug> fmt::Debug for PatriciaMap<V> {

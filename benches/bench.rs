@@ -9,7 +9,9 @@ use rand::Rng;
 #[bench]
 fn bench_insertion(b: &mut test::Bencher) {
     let mut set = PatriciaSet::new();
-    b.iter(|| { set.insert(rand::random::<usize>().to_string()); });
+    b.iter(|| {
+        set.insert(rand::random::<usize>().to_string());
+    });
 }
 
 #[bench]
@@ -38,5 +40,7 @@ fn bench_removal(b: &mut test::Bencher) {
     rand::thread_rng().shuffle(&mut values[..]);
 
     let mut values = values.iter().cycle();
-    b.iter(|| { set.remove(values.next().unwrap().to_string()); });
+    b.iter(|| {
+        set.remove(values.next().unwrap().to_string());
+    });
 }

@@ -22,7 +22,9 @@ impl PatriciaSet {
     /// assert!(set.is_empty());
     /// ```
     pub fn new() -> Self {
-        PatriciaSet { map: PatriciaMap::new() }
+        PatriciaSet {
+            map: PatriciaMap::new(),
+        }
     }
 
     /// Returns the number of elements in this set.

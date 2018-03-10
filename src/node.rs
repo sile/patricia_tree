@@ -347,7 +347,9 @@ impl<V> Node<V> {
     ///            ]);
     /// ```
     pub fn iter(&self) -> Iter<V> {
-        Iter { stack: vec![(0, self)] }
+        Iter {
+            stack: vec![(0, self)],
+        }
     }
 
     pub(crate) fn get(&self, key: &[u8]) -> Option<&V> {
@@ -390,13 +392,13 @@ impl<V> Node<V> {
                     old
                 })
             } else {
-                self.child_mut().and_then(|child| child.remove(next)).map(
-                    |old| {
+                self.child_mut()
+                    .and_then(|child| child.remove(next))
+                    .map(|old| {
                         self.try_reclaim_child();
                         self.try_merge_with_child();
                         old
-                    },
-                )
+                    })
             }
         } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
             self.sibling_mut()
@@ -537,15 +539,15 @@ impl<V> Node<V> {
         }
     }
     fn try_merge_with_child(&mut self) {
-        if self.flags().contains(Flags::VALUE_INITIALIZED) ||
-            !self.flags().contains(Flags::CHILD_INITIALIZED)
+        if self.flags().contains(Flags::VALUE_INITIALIZED)
+            || !self.flags().contains(Flags::CHILD_INITIALIZED)
         {
             return;
         }
 
         let flags = assert_some!(self.child()).flags();
-        if !flags.contains(Flags::SIBLING_INITIALIZED) &&
-            (self.label_len() + assert_some!(self.child()).label_len()) <= MAX_LABEL_LEN
+        if !flags.contains(Flags::SIBLING_INITIALIZED)
+            && (self.label_len() + assert_some!(self.child()).label_len()) <= MAX_LABEL_LEN
         {
             let mut child = assert_some!(self.take_child());
             let sibling = self.take_sibling();
@@ -583,7 +585,9 @@ impl<V> IntoIterator for Node<V> {
     type Item = (usize, Node<V>);
     type IntoIter = IntoIter<V>;
     fn into_iter(self) -> Self::IntoIter {
-        IntoIter { stack: vec![(0, self)] }
+        IntoIter {
+            stack: vec![(0, self)],
+        }
     }
 }
 
