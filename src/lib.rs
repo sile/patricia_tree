@@ -28,9 +28,14 @@
 
 #[macro_use]
 extern crate bitflags;
+#[cfg(feature = "binary-format")]
+extern crate bytecodec;
 extern crate libc;
 #[cfg(test)]
 extern crate rand;
+#[cfg(feature = "binary-format")]
+#[macro_use]
+extern crate trackable;
 
 pub use map::PatriciaMap;
 pub use set::PatriciaSet;
@@ -39,4 +44,6 @@ pub mod map;
 pub mod node;
 pub mod set;
 
+#[cfg(feature = "binary-format")]
+mod codec;
 mod tree;

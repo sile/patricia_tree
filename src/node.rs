@@ -16,7 +16,7 @@ macro_rules! assert_some {
 }
 
 bitflags! {
-    struct Flags: u8 {
+    pub (crate) struct Flags: u8 {
         const VALUE_ALLOCATED = 0b0000_0001;
         const VALUE_INITIALIZED = 0b0000_0010;
 
@@ -27,6 +27,9 @@ bitflags! {
         const SIBLING_INITIALIZED = 0b0010_0000;
     }
 }
+
+#[cfg(feature = "binary-format")]
+pub use codec::{NodeDecoder, NodeEncoder};
 
 const FLAGS_OFFSET: isize = 0;
 const LABEL_LEN_OFFSET: isize = 1;
@@ -40,7 +43,7 @@ const MAX_LABEL_LEN: usize = 255;
 /// Usually it is recommended to use more high level data structures (e.g., `PatriciaTree`).
 #[derive(Debug)]
 pub struct Node<V> {
-    // layout;
+    // layout:
     //   - flags: u8
     //   - label_len: u8
     //   - label: [u8; LABEL_LEN]
@@ -152,11 +155,48 @@ impl<V> Node<V> {
         }
     }
 
+    #[cfg(feature = "binary-format")]
+    pub(crate) fn new_for_decoding(flags: Flags, label_len: u8) -> Self {
+        let mut init_flags = Flags::empty();
+        let mut block_size = LABEL_OFFSET as usize + label_len as usize;
+        if flags.contains(Flags::VALUE_INITIALIZED) {
+            init_flags.insert(Flags::VALUE_ALLOCATED);
+            block_size += mem::size_of::<V>();
+        }
+        if flags.contains(Flags::CHILD_INITIALIZED) {
+            init_flags.insert(Flags::CHILD_ALLOCATED);
+            block_size += mem::size_of::<Self>();
+        }
+        if flags.contains(Flags::SIBLING_INITIALIZED) {
+            init_flags.insert(Flags::SIBLING_ALLOCATED);
+            block_size += mem::size_of::<Self>();
+        }
+        let ptr = unsafe { libc::malloc(block_size) } as *mut u8;
+        assert_ne!(ptr, ptr::null_mut());
+
+        unsafe {
+            ptr::write(ptr.offset(FLAGS_OFFSET), init_flags.bits());
+            ptr::write(ptr.offset(LABEL_LEN_OFFSET), label_len);
+        }
+        Node {
+            ptr,
+            _value: PhantomData,
+        }
+    }
+
     /// Returns the label of this node.
     pub fn label(&self) -> &[u8] {
         unsafe {
             let label_len = *self.ptr.offset(LABEL_LEN_OFFSET) as usize;
             slice::from_raw_parts(self.ptr.offset(LABEL_OFFSET), label_len)
+        }
+    }
+
+    #[cfg(feature = "binary-format")]
+    pub(crate) fn label_mut(&mut self) -> &mut [u8] {
+        unsafe {
+            let label_len = *self.ptr.offset(LABEL_LEN_OFFSET) as usize;
+            slice::from_raw_parts_mut(self.ptr.offset(LABEL_OFFSET), label_len)
         }
     }
 
@@ -487,7 +527,7 @@ impl<V> Node<V> {
             .take_while(|x| x.0 == x.1)
             .count()
     }
-    fn flags(&self) -> Flags {
+    pub(crate) fn flags(&self) -> Flags {
         Flags::from_bits_truncate(unsafe { *self.ptr })
     }
     fn set_flags(&mut self, other: Flags, value: bool) {

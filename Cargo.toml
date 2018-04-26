@@ -14,10 +14,18 @@ license = "MIT"
 travis-ci = { repository = "sile/patricia_tree" }
 codecov = { repository = "sile/patricia_tree" }
 
+[features]
+binary-format = ["bytecodec", "trackable"]
+
 [dependencies]
 bitflags = "1"
+bytecodec = { version = "0.2", optional = true }
 libc = "0.2"
+trackable = { version = "0.2", optional = true }
 
 [dev-dependencies]
 clap = "2"
 rand = "0.4"
+
+[package.metadata.docs.rs]
+all-features = true

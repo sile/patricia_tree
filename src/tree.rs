@@ -174,4 +174,5 @@ mod test {
         assert_eq!(tree2.get("bar"), Some(&7));
         assert_eq!(tree2.get("baz"), Some(&8));
     }
+
 }
