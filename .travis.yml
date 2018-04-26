@@ -12,6 +12,9 @@ env:
   global:
   - RUSTFLAGS="-C link-dead-code"
 
+script:
+  - cargo test --verbose --all-features
+
 addons:
   apt:
     packages:
