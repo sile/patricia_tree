@@ -1,7 +1,6 @@
 //! A map based on a patricia tree.
 use std::fmt;
 use std::iter::FromIterator;
-use std::mem;
 
 use node::Node;
 use tree::{self, PatriciaTree};
@@ -416,7 +415,7 @@ impl<'a, V: 'a> Iterator for IterMut<'a, V> {
             self.key.truncate(key_len);
             self.key.extend(node.label());
 
-            let node = unsafe { mem::transmute::<_, &'a mut Node<V>>(node) };
+            let node = unsafe { &mut *(node as *const _ as *mut Node<V>) };
             if let Some(value) = node.value_mut() {
                 return Some((self.key.clone(), value));
             }
@@ -462,7 +461,7 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
     #[allow(mutable_transmutes)]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((_, node)) = self.nodes.next() {
-            let node = unsafe { mem::transmute::<_, &'a mut Node<V>>(node) };
+            let node = unsafe { &mut *(node as *const _ as *mut Node<V>) };
             if let Some(value) = node.value_mut() {
                 return Some(value);
             }

@@ -25,6 +25,7 @@
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))] // for `bitflags` crate
 #![cfg_attr(feature = "cargo-clippy", allow(suspicious_arithmetic_impl))] // for `bitflags` crate
+#![cfg_attr(feature = "cargo-clippy", allow(cast_ptr_alignment))]
 
 #[macro_use]
 extern crate bitflags;
