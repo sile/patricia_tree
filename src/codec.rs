@@ -331,6 +331,7 @@ mod test {
         assert_eq!(size, buf.len());
 
         let map = PatriciaMap::from(item.unwrap());
+        assert_eq!(map.len(), 3);
         assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
     }
 
@@ -354,6 +355,7 @@ mod test {
         assert_eq!(size, buf.len());
 
         let map = PatriciaMap::from(item.unwrap());
+        assert_eq!(map.len(), 10000);
         assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
     }
 }

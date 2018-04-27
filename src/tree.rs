@@ -73,7 +73,7 @@ impl<V> Default for PatriciaTree<V> {
 impl<V> From<Node<V>> for PatriciaTree<V> {
     fn from(f: Node<V>) -> Self {
         let mut this = PatriciaTree { root: f, len: 0 };
-        let count = this.nodes().count();
+        let count = this.nodes().filter(|n| n.1.value().is_some()).count();
         this.len = count;
         this
     }
