@@ -116,8 +116,8 @@ impl<V: Decode> Decode for NodeDecoder<V> {
         Ok((offset, None))
     }
 
-    fn has_terminated(&self) -> bool {
-        self.stack.is_empty() && self.value_decoder.has_terminated()
+    fn is_idle(&self) -> bool {
+        self.stack.is_empty()
     }
 
     fn requiring_bytes(&self) -> ByteCount {
@@ -253,8 +253,8 @@ impl Decode for HeaderDecoder {
         Ok((size, item))
     }
 
-    fn has_terminated(&self) -> bool {
-        self.inner.has_terminated()
+    fn is_idle(&self) -> bool {
+        self.inner.is_idle()
     }
 
     fn requiring_bytes(&self) -> ByteCount {
