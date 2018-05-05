@@ -1,6 +1,6 @@
 [package]
 name = "patricia_tree"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
 description = "Memory-efficient data structures based on patricia tree"
 homepage = "https://github.com/sile/patricia_tree"
