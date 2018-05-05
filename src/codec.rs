@@ -116,10 +116,6 @@ impl<V: Decode> Decode for NodeDecoder<V> {
         Ok((offset, None))
     }
 
-    fn is_idle(&self) -> bool {
-        self.stack.is_empty()
-    }
-
     fn requiring_bytes(&self) -> ByteCount {
         ByteCount::Unknown
     }
@@ -251,10 +247,6 @@ impl Decode for HeaderDecoder {
             level: t.2,
         });
         Ok((size, item))
-    }
-
-    fn is_idle(&self) -> bool {
-        self.inner.is_idle()
     }
 
     fn requiring_bytes(&self) -> ByteCount {
