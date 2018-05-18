@@ -19,7 +19,7 @@ binary-format = ["bytecodec", "trackable"]
 
 [dependencies]
 bitflags = "1"
-bytecodec = { version = "0.3", optional = true }
+bytecodec = { version = "0.4", optional = true }
 libc = "0.2"
 trackable = { version = "0.2", optional = true }
 

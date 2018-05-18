@@ -1,8 +1,8 @@
-use std::cmp;
-use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, Result};
 use bytecodec::combinator::Omittable;
 use bytecodec::fixnum::{U16beDecoder, U16beEncoder, U8Decoder, U8Encoder};
-use bytecodec::tuple::{Tuple3Decoder, Tuple3Encoder};
+use bytecodec::tuple::{TupleDecoder, TupleEncoder};
+use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, Result};
+use std::cmp;
 
 use node::{Flags, Node};
 
@@ -32,6 +32,7 @@ pub struct NodeDecoder<V: Decode> {
     label_offset: usize,
     header_decoder: HeaderDecoder,
     value_decoder: Omittable<V>,
+    decoded: Option<Node<V::Item>>,
 }
 impl<V: Decode> NodeDecoder<V> {
     /// Makes a new `NodeDecoder` instance.
@@ -42,26 +43,27 @@ impl<V: Decode> NodeDecoder<V> {
             label_offset: 0,
             header_decoder: HeaderDecoder::default(),
             value_decoder: value_decoder.omit(false),
+            decoded: None,
         }
     }
 }
 impl<V: Decode> Decode for NodeDecoder<V> {
     type Item = Node<V::Item>;
 
-    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
+    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
+        if self.is_idle() {
+            return Ok(0);
+        }
+
         let mut offset = 0;
         loop {
             if self.node.is_none() {
-                let (size, item) = track!(self.header_decoder.decode(&buf[offset..], eos))?;
-                offset += size;
-                if let Some(header) = item {
-                    let node = Node::new_for_decoding(header.flags, header.label_len);
-                    self.value_decoder
-                        .do_omit(!node.flags().contains(Flags::VALUE_ALLOCATED));
-                    self.node = Some((header.level, node));
-                } else {
-                    break;
-                }
+                bytecodec_try_decode!(self.header_decoder, offset, buf, eos);
+                let header = track!(self.header_decoder.finish_decoding())?;
+                let node = Node::new_for_decoding(header.flags, header.label_len);
+                self.value_decoder
+                    .do_omit(!node.flags().contains(Flags::VALUE_ALLOCATED));
+                self.node = Some((header.level, node));
             }
             {
                 let ref mut node = self.node.as_mut().expect("Never fails").1;
@@ -77,47 +79,57 @@ impl<V: Decode> Decode for NodeDecoder<V> {
                 }
             }
 
-            let (size, item) = track!(self.value_decoder.decode(&buf[offset..], eos))?;
-            offset += size;
-            if let Some(value) = item {
-                let (level, mut node) = self.node.take().expect("Never fails");
-                if let Some(value) = value {
-                    node.set_value(value);
-                }
-                self.label_offset = 0;
+            bytecodec_try_decode!(self.value_decoder, offset, buf, eos);
+            let value = track!(self.value_decoder.finish_decoding())?;
+            let (level, mut node) = self.node.take().expect("Never fails");
+            if let Some(value) = value {
+                node.set_value(value);
+            }
+            self.label_offset = 0;
 
-                self.stack.push((level, node));
-                while let Some(node) = self.stack.pop() {
-                    let flags = node.1.flags();
-                    let has_next = (flags.contains(Flags::CHILD_ALLOCATED)
-                        && !flags.contains(Flags::CHILD_INITIALIZED))
-                        || (flags.contains(Flags::SIBLING_ALLOCATED)
-                            && !flags.contains(Flags::SIBLING_INITIALIZED));
-                    if has_next {
-                        self.stack.push(node);
-                        break;
-                    }
-                    if let Some(pred) = self.stack.last_mut() {
-                        if node.0 == pred.0 {
-                            pred.1.set_sibling(node.1);
-                        } else {
-                            track_assert_eq!(pred.0 + 1, node.0, ErrorKind::InvalidInput);
-                            pred.1.set_child(node.1);
-                        }
-                    } else {
-                        track_assert_eq!(node.0, 0, ErrorKind::InvalidInput);
-                        return Ok((offset, Some(node.1)));
-                    }
+            self.stack.push((level, node));
+            while let Some(node) = self.stack.pop() {
+                let flags = node.1.flags();
+                let has_next = (flags.contains(Flags::CHILD_ALLOCATED)
+                    && !flags.contains(Flags::CHILD_INITIALIZED))
+                    || (flags.contains(Flags::SIBLING_ALLOCATED)
+                        && !flags.contains(Flags::SIBLING_INITIALIZED));
+                if has_next {
+                    self.stack.push(node);
+                    break;
                 }
-            } else {
-                break;
+                if let Some(pred) = self.stack.last_mut() {
+                    if node.0 == pred.0 {
+                        pred.1.set_sibling(node.1);
+                    } else {
+                        track_assert_eq!(pred.0 + 1, node.0, ErrorKind::InvalidInput);
+                        pred.1.set_child(node.1);
+                    }
+                } else {
+                    track_assert_eq!(node.0, 0, ErrorKind::InvalidInput);
+                    self.decoded = Some(node.1);
+                    return Ok(offset);
+                }
             }
         }
-        Ok((offset, None))
+        Ok(offset)
+    }
+
+    fn finish_decoding(&mut self) -> Result<Self::Item> {
+        let item = track_assert_some!(self.decoded.take(), ErrorKind::IncompleteDecoding);
+        Ok(item)
     }
 
     fn requiring_bytes(&self) -> ByteCount {
-        ByteCount::Unknown
+        if self.is_idle() {
+            ByteCount::Finite(0)
+        } else {
+            ByteCount::Unknown
+        }
+    }
+
+    fn is_idle(&self) -> bool {
+        self.decoded.is_some()
     }
 }
 
@@ -234,29 +246,36 @@ impl<V: Encode> Encode for NodeEncoder<V> {
 
 #[derive(Debug, Default)]
 struct HeaderDecoder {
-    inner: Tuple3Decoder<U8Decoder, U8Decoder, U16beDecoder>,
+    inner: TupleDecoder<(U8Decoder, U8Decoder, U16beDecoder)>,
 }
 impl Decode for HeaderDecoder {
     type Item = Header;
 
-    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<(usize, Option<Self::Item>)> {
-        let (size, item) = track!(self.inner.decode(buf, eos))?;
-        let item = item.map(|t| Header {
-            flags: Flags::from_bits_truncate(t.0),
-            label_len: t.1,
-            level: t.2,
-        });
-        Ok((size, item))
+    fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
+        track!(self.inner.decode(buf, eos))
+    }
+
+    fn finish_decoding(&mut self) -> Result<Self::Item> {
+        let item = track!(self.inner.finish_decoding())?;
+        Ok(Header {
+            flags: Flags::from_bits_truncate(item.0),
+            label_len: item.1,
+            level: item.2,
+        })
     }
 
     fn requiring_bytes(&self) -> ByteCount {
         self.inner.requiring_bytes()
     }
+
+    fn is_idle(&self) -> bool {
+        self.inner.is_idle()
+    }
 }
 
 #[derive(Debug, Default)]
 struct HeaderEncoder {
-    inner: Tuple3Encoder<U8Encoder, U8Encoder, U16beEncoder>,
+    inner: TupleEncoder<(U8Encoder, U8Encoder, U16beEncoder)>,
 }
 impl Encode for HeaderEncoder {
     type Item = Header;
@@ -297,13 +316,13 @@ impl Header {
 
 #[cfg(test)]
 mod test {
-    use bytecodec::{Decode, EncodeExt, Eos};
     use bytecodec::fixnum::{U32beDecoder, U32beEncoder, U8Decoder, U8Encoder};
     use bytecodec::io::IoEncodeExt;
+    use bytecodec::{Decode, EncodeExt, Eos};
 
+    use super::*;
     use PatriciaMap;
     use node::Node;
-    use super::*;
 
     #[test]
     fn encoder_and_decoder_works() {
@@ -318,11 +337,11 @@ mod test {
         track_try_unwrap!(encoder.encode_all(&mut buf));
 
         let mut decoder = NodeDecoder::new(U8Decoder::new());
-        let (size, item) = track_try_unwrap!(decoder.decode(&buf, Eos::new(true)));
-        assert!(item.is_some());
+        let size = track_try_unwrap!(decoder.decode(&buf, Eos::new(true)));
         assert_eq!(size, buf.len());
 
-        let map = PatriciaMap::from(item.unwrap());
+        let item = track_try_unwrap!(decoder.finish_decoding());
+        let map = PatriciaMap::from(item);
         assert_eq!(map.len(), 3);
         assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
     }
@@ -342,11 +361,11 @@ mod test {
         track_try_unwrap!(encoder.encode_all(&mut buf));
 
         let mut decoder = NodeDecoder::new(U32beDecoder::new());
-        let (size, item) = track_try_unwrap!(decoder.decode(&buf, Eos::new(true)));
-        assert!(item.is_some());
+        let size = track_try_unwrap!(decoder.decode(&buf, Eos::new(true)));
         assert_eq!(size, buf.len());
 
-        let map = PatriciaMap::from(item.unwrap());
+        let item = track_try_unwrap!(decoder.finish_decoding());
+        let map = PatriciaMap::from(item);
         assert_eq!(map.len(), 10000);
         assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
     }
