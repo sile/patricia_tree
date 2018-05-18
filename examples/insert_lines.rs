@@ -1,10 +1,10 @@
 extern crate clap;
 extern crate patricia_tree;
 
-use std::collections::{BTreeSet, HashSet};
-use std::io::BufRead;
 use clap::{App, Arg};
 use patricia_tree::PatriciaSet;
+use std::collections::{BTreeSet, HashSet};
+use std::io::BufRead;
 
 fn main() {
     let matches = App::new("insert_lines")

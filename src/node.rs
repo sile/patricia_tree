@@ -1,9 +1,9 @@
 //! A node which represents a subtree of a patricia tree.
+use libc;
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
 use std::slice;
-use libc;
 
 macro_rules! assert_some {
     ($expr:expr) => {
@@ -12,7 +12,7 @@ macro_rules! assert_some {
         } else {
             panic!("`{}` must be `Some(..)`", stringify!($expr));
         }
-    }
+    };
 }
 
 bitflags! {
@@ -706,8 +706,8 @@ impl<V> Iterator for IntoIter<V> {
 mod test {
     use std::str;
 
-    use PatriciaSet;
     use super::*;
+    use PatriciaSet;
 
     #[test]
     fn long_label_works() {

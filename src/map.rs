@@ -472,8 +472,8 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
 
 #[cfg(test)]
 mod test {
-    use rand::{self, Rng};
     use super::*;
+    use rand::{self, Rng};
 
     #[test]
     fn it_works() {
