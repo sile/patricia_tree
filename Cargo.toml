@@ -25,7 +25,7 @@ trackable = { version = "0.2", optional = true }
 
 [dev-dependencies]
 clap = "2"
-rand = "0.4"
+rand = "0.5"
 
 [package.metadata.docs.rs]
 all-features = true
