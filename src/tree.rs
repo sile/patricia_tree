@@ -45,6 +45,15 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
+    pub fn split_by_prefix<K: AsRef<[u8]>>(&mut self, prefix: K) -> Self {
+        unimplemented!()
+        //     if let Some(node) = self.root.remove_by_prefix(prefix) {
+        //         self.len -= node.iter().count();
+        //         node
+        //     } else {
+        //         Node::root()
+        //     }
+    }
     pub fn clear(&mut self) {
         self.root = Node::root();
         self.len = 0;
