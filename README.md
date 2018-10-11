@@ -1,7 +1,7 @@
 patricia_tree
 =============
 
-[![patricia_tree](http://meritbadge.herokuapp.com/patricia_tree)](https://crates.io/crates/patricia_tree)
+[![patricia_tree](https://img.shields.io/crates/v/patricia_tree.svg)](https://crates.io/crates/patricia_tree)
 [![Documentation](https://docs.rs/patricia_tree/badge.svg)](https://docs.rs/patricia_tree)
 [![Build Status](https://travis-ci.org/sile/patricia_tree.svg?branch=master)](https://travis-ci.org/sile/patricia_tree)
 [![Code Coverage](https://codecov.io/gh/sile/patricia_tree/branch/master/graph/badge.svg)](https://codecov.io/gh/sile/patricia_tree/branch/master)
