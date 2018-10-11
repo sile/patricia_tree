@@ -155,6 +155,32 @@ impl PatriciaSet {
         self.map.remove(value).is_some()
     }
 
+    /// Splits the set into two at the given prefix.
+    ///
+    /// The returned set contains all the entries that prefixed by `prefix`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaSet;
+    ///
+    /// let mut a = PatriciaSet::new();
+    /// a.insert("rust");
+    /// a.insert("ruby");
+    /// a.insert("python");
+    /// a.insert("erlang");
+    ///
+    /// let b = a.split_by_prefix("ru");
+    ///
+    /// assert_eq!(a.iter().collect::<Vec<_>>(), [b"erlang", b"python"]);
+    /// assert_eq!(b.iter().collect::<Vec<_>>(), [b"ruby", b"rust"]);
+    /// ```
+    pub fn split_by_prefix<T: AsRef<[u8]>>(&mut self, prefix: T) -> Self {
+        PatriciaSet {
+            map: self.map.split_by_prefix(prefix),
+        }
+    }
+
     /// Gets an iterator over the contents of this set, in sorted order.
     ///
     /// # Examples
@@ -252,7 +278,7 @@ impl Iterator for IntoIter {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
@@ -281,5 +307,66 @@ mod test {
             set.into_iter().collect::<Vec<_>>(),
             [Vec::from("bar"), "baz".into(), "foo".into()]
         );
+    }
+
+    #[test]
+    fn split_by_prefix_works() {
+        let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let splitted_set = set.split_by_prefix("");
+        assert!(set.is_empty());
+        assert_eq!(
+            splitted_set.iter().collect::<Vec<_>>(),
+            [b"bar", b"baz", b"foo"]
+        );
+
+        let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let splitted_set = set.split_by_prefix("f");
+        assert_eq!(set.iter().collect::<Vec<_>>(), [b"bar", b"baz"]);
+        assert_eq!(splitted_set.iter().collect::<Vec<_>>(), [b"foo"]);
+
+        let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let splitted_set = set.split_by_prefix("fo");
+        assert_eq!(set.iter().collect::<Vec<_>>(), [b"bar", b"baz"]);
+        assert_eq!(splitted_set.iter().collect::<Vec<_>>(), [b"foo"]);
+
+        let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let splitted_set = set.split_by_prefix("foo");
+        assert_eq!(set.iter().collect::<Vec<_>>(), [b"bar", b"baz"]);
+        assert_eq!(splitted_set.iter().collect::<Vec<_>>(), [b"foo"]);
+
+        let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let splitted_set = set.split_by_prefix("b");
+        assert_eq!(set.iter().collect::<Vec<_>>(), [b"foo"]);
+        assert_eq!(splitted_set.iter().collect::<Vec<_>>(), [b"bar", b"baz"]);
+
+        let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let splitted_set = set.split_by_prefix("ba");
+        assert_eq!(set.iter().collect::<Vec<_>>(), [b"foo"]);
+        assert_eq!(splitted_set.iter().collect::<Vec<_>>(), [b"bar", b"baz"]);
+
+        let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let splitted_set = set.split_by_prefix("bar");
+        assert_eq!(set.iter().collect::<Vec<_>>(), [b"baz", b"foo"]);
+        assert_eq!(splitted_set.iter().collect::<Vec<_>>(), [b"bar"]);
+
+        let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let splitted_set = set.split_by_prefix("baz");
+        assert_eq!(set.iter().collect::<Vec<_>>(), [b"bar", b"foo"]);
+        assert_eq!(splitted_set.iter().collect::<Vec<_>>(), [b"baz"]);
+
+        let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let splitted_set = set.split_by_prefix("bazz");
+        assert_eq!(set.iter().collect::<Vec<_>>(), [b"bar", b"baz", b"foo"]);
+        assert!(splitted_set.is_empty());
+
+        let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let splitted_set = set.split_by_prefix("for");
+        assert_eq!(set.iter().collect::<Vec<_>>(), [b"bar", b"baz", b"foo"]);
+        assert!(splitted_set.is_empty());
+
+        let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let splitted_set = set.split_by_prefix("qux");
+        assert_eq!(set.iter().collect::<Vec<_>>(), [b"bar", b"baz", b"foo"]);
+        assert!(splitted_set.is_empty());
     }
 }

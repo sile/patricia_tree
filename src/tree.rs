@@ -46,13 +46,16 @@ impl<V> PatriciaTree<V> {
         }
     }
     pub fn split_by_prefix<K: AsRef<[u8]>>(&mut self, prefix: K) -> Self {
-        unimplemented!()
-        //     if let Some(node) = self.root.remove_by_prefix(prefix) {
-        //         self.len -= node.iter().count();
-        //         node
-        //     } else {
-        //         Node::root()
-        //     }
+        if let Some(splitted_root) = self.root.split_by_prefix(prefix.as_ref()) {
+            let mut splitted_root = Node::new(prefix.as_ref(), None, Some(splitted_root), None);
+            splitted_root.try_merge_with_child();
+
+            let splitted = Self::from(splitted_root);
+            self.len -= splitted.len();
+            splitted
+        } else {
+            Self::new()
+        }
     }
     pub fn clear(&mut self) {
         self.root = Node::root();
@@ -129,7 +132,7 @@ impl<V> Iterator for IntoNodes<V> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]

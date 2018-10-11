@@ -158,6 +158,34 @@ impl<V> PatriciaMap<V> {
         self.tree.remove(key)
     }
 
+    /// Splits the map into two at the given prefix.
+    ///
+    /// The returned map contains all the entries of which keys are prefixed by `prefix`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut a = PatriciaMap::new();
+    /// a.insert("rust", 1);
+    /// a.insert("ruby", 2);
+    /// a.insert("bash", 3);
+    /// a.insert("erlang", 4);
+    /// a.insert("elixir", 5);
+    ///
+    /// let b = a.split_by_prefix("e");
+    /// assert_eq!(a.len(), 3);
+    /// assert_eq!(b.len(), 2);
+    ///
+    /// assert_eq!(a.keys().collect::<Vec<_>>(), [b"bash", b"ruby", b"rust"]);
+    /// assert_eq!(b.keys().collect::<Vec<_>>(), [b"elixir", b"erlang"]);
+    /// ```
+    pub fn split_by_prefix<K: AsRef<[u8]>>(&mut self, prefix: K) -> Self {
+        let subtree = self.tree.split_by_prefix(prefix);
+        PatriciaMap { tree: subtree }
+    }
+
     /// Returns the number of elements in this map.
     ///
     /// # Examples
@@ -471,7 +499,7 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use rand::{self, Rng};
 

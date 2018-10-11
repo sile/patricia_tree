@@ -445,6 +445,37 @@ impl<V> Node<V> {
             None
         }
     }
+    pub(crate) fn split_by_prefix(&mut self, prefix: &[u8]) -> Option<Self> {
+        let common_prefix_len = self.skip_common_prefix(prefix);
+        if common_prefix_len == prefix.len() {
+            let value = self.take_value();
+            let child = self.take_child();
+            let node = Node::new(&self.label()[common_prefix_len..], value, child, None);
+            if let Some(sibling) = self.take_sibling() {
+                *self = sibling;
+            }
+            Some(node)
+        } else if common_prefix_len == self.label().len() {
+            let next = &prefix[common_prefix_len..];
+            self.child_mut()
+                .and_then(|child| child.split_by_prefix(next))
+                .map(|old| {
+                    self.try_reclaim_child();
+                    self.try_merge_with_child();
+                    old
+                })
+        } else if common_prefix_len == 0 && self.label().get(0) <= prefix.get(0) {
+            let next = &prefix[common_prefix_len..];
+            self.sibling_mut()
+                .and_then(|sibling| sibling.split_by_prefix(next))
+                .map(|old| {
+                    self.try_reclaim_sibling();
+                    old
+                })
+        } else {
+            None
+        }
+    }
     pub(crate) fn remove(&mut self, key: &[u8]) -> Option<V> {
         let common_prefix_len = self.skip_common_prefix(key);
         let next = &key[common_prefix_len..];
@@ -601,7 +632,7 @@ impl<V> Node<V> {
             self.set_child(child);
         }
     }
-    fn try_merge_with_child(&mut self) {
+    pub(crate) fn try_merge_with_child(&mut self) {
         if self.flags().contains(Flags::VALUE_INITIALIZED)
             || !self.flags().contains(Flags::CHILD_INITIALIZED)
         {
@@ -703,7 +734,7 @@ impl<V> Iterator for IntoIter<V> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::str;
 
     use super::*;

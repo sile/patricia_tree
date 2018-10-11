@@ -315,14 +315,14 @@ impl Header {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use bytecodec::fixnum::{U32beDecoder, U32beEncoder, U8Decoder, U8Encoder};
     use bytecodec::io::IoEncodeExt;
     use bytecodec::{Decode, EncodeExt, Eos};
 
     use super::*;
-    use PatriciaMap;
     use node::Node;
+    use PatriciaMap;
 
     #[test]
     fn encoder_and_decoder_works() {
