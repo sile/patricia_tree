@@ -2,10 +2,10 @@
 extern crate bytecodec;
 extern crate patricia_tree;
 
-use bytecodec::Encode;
 use bytecodec::io::IoEncodeExt;
 use bytecodec::null::NullEncoder;
-use patricia_tree::{PatriciaSet, node::NodeEncoder};
+use bytecodec::Encode;
+use patricia_tree::{node::NodeEncoder, PatriciaSet};
 use std::io::BufRead;
 
 fn main() {

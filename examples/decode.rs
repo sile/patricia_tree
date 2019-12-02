@@ -4,7 +4,7 @@ extern crate patricia_tree;
 
 use bytecodec::io::IoDecodeExt;
 use bytecodec::null::NullDecoder;
-use patricia_tree::{PatriciaSet, node::NodeDecoder};
+use patricia_tree::{node::NodeDecoder, PatriciaSet};
 
 fn main() {
     let mut decoder = NodeDecoder::new(NullDecoder);
