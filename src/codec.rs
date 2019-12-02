@@ -65,7 +65,7 @@ impl<V: Decode> Decode for NodeDecoder<V> {
                 self.node = Some((header.level, node));
             }
             {
-                let ref mut node = self.node.as_mut().expect("Never fails").1;
+                let node = &mut self.node.as_mut().expect("Never fails").1;
                 if self.label_offset < node.label().len() {
                     let size = cmp::min(buf.len() - offset, node.label().len() - self.label_offset);
                     (&mut node.label_mut()[self.label_offset..][..size])
@@ -195,7 +195,7 @@ impl<V: Encode> Encode for NodeEncoder<V> {
                 };
             }
             {
-                let ref node = self.stack.last().expect("Never fails").1;
+                let node = &self.stack.last().expect("Never fails").1;
                 if self.label_offset < node.label().len() {
                     let size = cmp::min(buf.len() - offset, node.label().len() - self.label_offset);
                     (&mut buf[offset..][..size])

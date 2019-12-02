@@ -389,6 +389,14 @@ impl<V> Node<V> {
     pub fn iter(&self) -> Iter<V> {
         Iter {
             stack: vec![(0, self)],
+            include_root_sibling: true,
+        }
+    }
+
+    pub(crate) fn iter_descendant(&self) -> Iter<V> {
+        Iter {
+            stack: vec![(0, self)],
+            include_root_sibling: false,
         }
     }
 
@@ -441,6 +449,22 @@ impl<V> Node<V> {
         } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
             self.sibling()
                 .and_then(|sibling| sibling.get_longest_common_prefix(next, offset))
+        } else {
+            None
+        }
+    }
+    pub(crate) fn get_prefix_node(&self, key: &[u8], offset: usize) -> Option<(usize, &Self)> {
+        let common_prefix_len = self.skip_common_prefix(key);
+        let next = &key[common_prefix_len..];
+        if next.is_empty() {
+            Some((common_prefix_len, self))
+        } else if common_prefix_len == self.label().len() {
+            let offset = offset + common_prefix_len;
+            self.child()
+                .and_then(|child| child.get_prefix_node(next, offset))
+        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+            self.sibling()
+                .and_then(|sibling| sibling.get_prefix_node(next, offset))
         } else {
             None
         }
@@ -691,13 +715,16 @@ impl<V> IntoIterator for Node<V> {
 #[derive(Debug)]
 pub struct Iter<'a, V: 'a> {
     stack: Vec<(usize, &'a Node<V>)>,
+    include_root_sibling: bool,
 }
 impl<'a, V: 'a> Iterator for Iter<'a, V> {
     type Item = (usize, &'a Node<V>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, node)) = self.stack.pop() {
-            if let Some(sibling) = node.sibling() {
-                self.stack.push((level, sibling));
+            if level != 0 || self.include_root_sibling {
+                if let Some(sibling) = node.sibling() {
+                    self.stack.push((level, sibling));
+                }
             }
             if let Some(child) = node.child() {
                 self.stack.push((level + 1, child));
