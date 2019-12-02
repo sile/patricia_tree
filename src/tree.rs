@@ -37,6 +37,18 @@ impl<V> PatriciaTree<V> {
             .get_longest_common_prefix(key, 0)
             .map(|(n, v)| (&key[..n], v))
     }
+    pub fn iter_prefix<'a, 'b>(
+        &'a self,
+        prefix: &'b [u8],
+    ) -> impl 'a + Iterator<Item = (usize, &'a Node<V>)> {
+        self.root
+            .get_prefix_node(prefix, 0)
+            .into_iter()
+            .flat_map(|(common_prefix_len, root)| Nodes {
+                nodes: root.iter(),
+                label_lens: Vec::new(),
+            })
+    }
     pub fn remove<K: AsRef<[u8]>>(&mut self, key: K) -> Option<V> {
         if let Some(old) = self.root.remove(key.as_ref()) {
             self.len -= 1;

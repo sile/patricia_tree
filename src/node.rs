@@ -445,6 +445,22 @@ impl<V> Node<V> {
             None
         }
     }
+    pub(crate) fn get_prefix_node(&self, key: &[u8], offset: usize) -> Option<(usize, &Self)> {
+        let common_prefix_len = self.skip_common_prefix(key);
+        let next = &key[common_prefix_len..];
+        if next.is_empty() {
+            Some((common_prefix_len, self))
+        } else if common_prefix_len == self.label().len() {
+            let offset = offset + common_prefix_len;
+            self.child()
+                .and_then(|child| child.get_prefix_node(next, offset))
+        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+            self.sibling()
+                .and_then(|sibling| sibling.get_prefix_node(next, offset))
+        } else {
+            None
+        }
+    }
     pub(crate) fn split_by_prefix(&mut self, prefix: &[u8]) -> Option<Self> {
         let common_prefix_len = self.skip_common_prefix(prefix);
         if common_prefix_len == prefix.len() {
