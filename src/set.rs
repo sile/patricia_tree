@@ -197,6 +197,27 @@ impl PatriciaSet {
     pub fn iter(&self) -> Iter {
         Iter(self.map.keys())
     }
+
+    /// Gets an iterator over the contents having the given prefix of this set, in sorted order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaSet;
+    ///
+    /// let mut set = PatriciaSet::new();
+    /// set.insert("foo");
+    /// set.insert("bar");
+    /// set.insert("baz");
+    ///
+    /// assert_eq!(set.iter_prefix(b"ba").collect::<Vec<_>>(), [Vec::from("bar"), "baz".into()]);
+    /// ```
+    pub fn iter_prefix<'a, 'b>(&'a self, prefix: &'b [u8]) -> impl 'a + Iterator<Item = Vec<u8>>
+    where
+        'b: 'a,
+    {
+        self.map.iter_prefix(prefix).map(|(k, _)| k)
+    }
 }
 impl fmt::Debug for PatriciaSet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -367,5 +388,56 @@ mod tests {
         let splitted_set = set.split_by_prefix("qux");
         assert_eq!(set.iter().collect::<Vec<_>>(), [b"bar", b"baz", b"foo"]);
         assert!(splitted_set.is_empty());
+    }
+
+    #[test]
+    fn iter_prefix_works() {
+        fn assert_iter_prefix(set: &PatriciaSet, prefix: &str) {
+            let actual = set.iter_prefix(prefix.as_bytes()).collect::<Vec<_>>();
+            let expected = set
+                .iter()
+                .filter(|key| key.starts_with(prefix.as_bytes()))
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected);
+        }
+
+        let set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
+        let prefixes = [
+            "", "a", "b", "ba", "bar", "baz", "bax", "c", "f", "fo", "foo",
+        ];
+        for prefix in &prefixes {
+            assert_iter_prefix(&set, prefix);
+        }
+
+        let set: PatriciaSet = vec![
+            "JavaScript",
+            "Python",
+            "Java",
+            "C++",
+            "Swift",
+            "TypeScript",
+            "Go",
+            "SQL",
+            "Ruby",
+            "R",
+            "PHP",
+            "Perl",
+            "Kotlin",
+            "C#",
+            "Rust",
+            "Scheme",
+            "Erlang",
+            "Scala",
+            "Elixir",
+            "Haskell",
+        ]
+        .into_iter()
+        .collect();
+        let prefixes = [
+            "", "P", "Py", "J", "Jav", "Java", "JavaS", "Rusti", "E", "El", "H", "S", "Sc",
+        ];
+        for prefix in &prefixes {
+            assert_iter_prefix(&set, prefix);
+        }
     }
 }

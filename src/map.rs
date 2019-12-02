@@ -234,10 +234,7 @@ impl<V> PatriciaMap<V> {
     ///            map.iter().collect::<Vec<_>>());
     /// ```
     pub fn iter(&self) -> Iter<V> {
-        Iter {
-            nodes: self.tree.nodes(),
-            key: Vec::new(),
-        }
+        Iter::new(self.tree.nodes(), Vec::new())
     }
 
     /// Gets a mutable iterator over the entries of this map, soretd by key.
@@ -259,6 +256,31 @@ impl<V> PatriciaMap<V> {
             nodes: self.tree.nodes(),
             key: Vec::new(),
         }
+    }
+
+    /// Gets an iterator over the entries having the given prefix of this map, sorted by key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let map: PatriciaMap<_> =
+    ///     vec![("foo", 1), ("bar", 2), ("baz", 3)].into_iter().collect();
+    /// assert_eq!(vec![(Vec::from("bar"), &2), ("baz".into(), &3)],
+    ///            map.iter_prefix(b"ba").collect::<Vec<_>>());
+    /// ```
+    pub fn iter_prefix<'a, 'b>(
+        &'a self,
+        prefix: &'b [u8],
+    ) -> impl 'a + Iterator<Item = (Vec<u8>, &'a V)>
+    where
+        'b: 'a,
+    {
+        self.tree
+            .iter_prefix(prefix)
+            .into_iter()
+            .flat_map(move |(prefix_len, nodes)| Iter::new(nodes, Vec::from(&prefix[..prefix_len])))
     }
 
     /// Gets an iterator over the keys of this map, in sorted order.
@@ -393,12 +415,23 @@ impl<V> AsRef<Node<V>> for PatriciaMap<V> {
 pub struct Iter<'a, V: 'a> {
     nodes: tree::Nodes<'a, V>,
     key: Vec<u8>,
+    key_offset: usize,
+}
+impl<'a, V: 'a> Iter<'a, V> {
+    fn new(nodes: tree::Nodes<'a, V>, key: Vec<u8>) -> Self {
+        let key_offset = key.len();
+        Self {
+            nodes,
+            key,
+            key_offset,
+        }
+    }
 }
 impl<'a, V: 'a> Iterator for Iter<'a, V> {
     type Item = (Vec<u8>, &'a V);
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((key_len, node)) = self.nodes.next() {
-            self.key.truncate(key_len);
+            self.key.truncate(self.key_offset + key_len);
             self.key.extend(node.label());
             if let Some(value) = node.value() {
                 return Some((self.key.clone(), value));
