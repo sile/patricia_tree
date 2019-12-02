@@ -4,7 +4,7 @@ extern crate rand;
 extern crate test;
 
 use patricia_tree::PatriciaSet;
-use rand::Rng;
+use rand::seq::SliceRandom;
 
 #[bench]
 fn bench_insertion(b: &mut test::Bencher) {
@@ -37,7 +37,7 @@ fn bench_removal(b: &mut test::Bencher) {
     }
 
     let mut values = (0..MAX).collect::<Vec<_>>();
-    rand::thread_rng().shuffle(&mut values[..]);
+    values.shuffle(&mut rand::thread_rng());
 
     let mut values = values.iter().cycle();
     b.iter(|| {
