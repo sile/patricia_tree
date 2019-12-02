@@ -29,7 +29,7 @@ bitflags! {
 }
 
 #[cfg(feature = "binary-format")]
-pub use codec::{NodeDecoder, NodeEncoder};
+pub use crate::codec::{NodeDecoder, NodeEncoder};
 
 const FLAGS_OFFSET: isize = 0;
 const LABEL_LEN_OFFSET: isize = 1;
@@ -735,10 +735,9 @@ impl<V> Iterator for IntoIter<V> {
 
 #[cfg(test)]
 mod tests {
-    use std::str;
-
     use super::*;
-    use PatriciaSet;
+    use crate::PatriciaSet;
+    use std::str;
 
     #[test]
     fn long_label_works() {

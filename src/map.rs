@@ -1,9 +1,8 @@
 //! A map based on a patricia tree.
+use crate::node::Node;
+use crate::tree::{self, PatriciaTree};
 use std::fmt;
 use std::iter::FromIterator;
-
-use node::Node;
-use tree::{self, PatriciaTree};
 
 /// A map based on a patricia tree.
 #[derive(Clone)]

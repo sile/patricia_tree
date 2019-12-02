@@ -1,9 +1,8 @@
 //! A set based on a patricia tree.
+use crate::map::{self, PatriciaMap};
+use crate::node::Node;
 use std::fmt;
 use std::iter::FromIterator;
-
-use map::{self, PatriciaMap};
-use node::Node;
 
 /// A set based on a patricia tree.
 #[derive(Default, Clone)]

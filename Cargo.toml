@@ -9,6 +9,7 @@ readme = "README.md"
 keywords = ["patricia", "radix", "trie"]
 categories = ["data-structures"]
 license = "MIT"
+edition = "2018"
 
 [badges]
 travis-ci = { repository = "sile/patricia_tree" }

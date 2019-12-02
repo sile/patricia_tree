@@ -1,10 +1,9 @@
+use crate::node::{Flags, Node};
 use bytecodec::combinator::Omittable;
 use bytecodec::fixnum::{U16beDecoder, U16beEncoder, U8Decoder, U8Encoder};
 use bytecodec::tuple::{TupleDecoder, TupleEncoder};
 use bytecodec::{ByteCount, Decode, DecodeExt, Encode, Eos, ErrorKind, Result};
 use std::cmp;
-
-use node::{Flags, Node};
 
 /// `[cfg(feature = "binary-format")]` Binary decoder for `Node`.
 ///
@@ -316,13 +315,12 @@ impl Header {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::node::Node;
+    use crate::PatriciaMap;
     use bytecodec::fixnum::{U32beDecoder, U32beEncoder, U8Decoder, U8Encoder};
     use bytecodec::io::IoEncodeExt;
     use bytecodec::{Decode, EncodeExt, Eos};
-
-    use super::*;
-    use node::Node;
-    use PatriciaMap;
 
     #[test]
     fn encoder_and_decoder_works() {
