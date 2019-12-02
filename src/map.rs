@@ -500,7 +500,8 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::{self, Rng};
+    use rand;
+    use rand::seq::SliceRandom;
 
     #[test]
     fn it_works() {
@@ -563,7 +564,7 @@ mod tests {
     #[test]
     fn large_map_works() {
         let mut input = (0..10000).map(|i| (i.to_string(), i)).collect::<Vec<_>>();
-        rand::thread_rng().shuffle(&mut input[..]);
+        input.shuffle(&mut rand::thread_rng());
 
         // Insert
         let mut map = input.iter().cloned().collect::<PatriciaMap<_>>();
