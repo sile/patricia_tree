@@ -46,7 +46,7 @@ pub struct Node<V> {
     // layout:
     //   - flags: u8
     //   - label_len: u8
-    //   - label: [u8; LABEL_LEN]
+    //   - label: [u8; label_len]
     //   - value: Option<V>
     //   - child: Option<Node<V>>
     //   - sibling: Option<Node<V>>
