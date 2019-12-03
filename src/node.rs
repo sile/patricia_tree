@@ -389,14 +389,12 @@ impl<V> Node<V> {
     pub fn iter(&self) -> Iter<V> {
         Iter {
             stack: vec![(0, self)],
-            include_root_sibling: true,
         }
     }
 
     pub(crate) fn iter_descendant(&self) -> Iter<V> {
         Iter {
             stack: vec![(0, self)],
-            include_root_sibling: false,
         }
     }
 
@@ -715,13 +713,12 @@ impl<V> IntoIterator for Node<V> {
 #[derive(Debug)]
 pub struct Iter<'a, V: 'a> {
     stack: Vec<(usize, &'a Node<V>)>,
-    include_root_sibling: bool,
 }
 impl<'a, V: 'a> Iterator for Iter<'a, V> {
     type Item = (usize, &'a Node<V>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, node)) = self.stack.pop() {
-            if level != 0 || self.include_root_sibling {
+            if level != 0 {
                 if let Some(sibling) = node.sibling() {
                     self.stack.push((level, sibling));
                 }
