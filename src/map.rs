@@ -10,21 +10,6 @@ pub struct PatriciaMap<V> {
     tree: PatriciaTree<V>,
 }
 
-impl<V> PatriciaMap<V>
-where
-    V: std::fmt::Debug,
-{
-    pub fn get_all_in<K: AsRef<[u8]>>(&self, key: K) -> Option<Vec<Option<&V>>> {
-        self.tree.get_all_in(key.as_ref())
-    }
-    pub fn collect_iter<'a, 'b, K: AsRef<[u8]>>(&'a self, key: &'b K) -> CollectKeyIter<'a, 'b, V> {
-        let prefix_iter = self.tree.prefix_iter(key.as_ref());
-        CollectKeyIter::new(prefix_iter)
-    }
-    pub fn label_iter(&self) -> LabelIter<V> {
-        LabelIter::new(self.tree.nodes(), Vec::new())
-    }
-}
 impl<V> PatriciaMap<V> {
     /// Makes a new empty `PatriciaMap` instance.
     ///
@@ -171,6 +156,33 @@ impl<V> PatriciaMap<V> {
     /// ```
     pub fn remove<K: AsRef<[u8]>>(&mut self, key: K) -> Option<V> {
         self.tree.remove(key)
+    }
+
+    /// Similar to `collect_iter` but calls recursively and returns all values in
+    /// a `Vec`, without the key that it matched on
+    pub fn get_all_in_prefix<K: AsRef<[u8]>>(&self, key: K) -> Option<Vec<&V>> {
+        self.tree.get_all_in_prefix(key.as_ref())
+    }
+    /// Returns an iterator that collects all items in the map up to a certain key
+    /// # Example
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    /// let mut t = PatriciaMap::new();
+    /// t.insert("a", vec!["a"]);
+    /// t.insert("x", vec!["x"]);
+    /// t.insert("ab", vec!["b"]);
+    /// t.insert("abc", vec!["c"]);
+    /// t.insert("abcd", vec!["d"]);
+    /// t.insert("abcdf", vec!["f"]);
+    /// assert!(t
+    ///     .collect_iter(&"abcde")
+    ///     .map(|(_, v)| v)
+    ///     .flatten()
+    ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
+    /// ```
+    pub fn collect_iter<'a, 'b, K: AsRef<[u8]>>(&'a self, key: &'b K) -> CollectKeyIter<'a, 'b, V> {
+        let prefix_iter = self.tree.collect_iter(key.as_ref());
+        CollectKeyIter::new(prefix_iter)
     }
 
     /// Splits the map into two at the given prefix.
@@ -456,36 +468,9 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
         None
     }
 }
-#[derive(Debug)]
-pub struct LabelIter<'a, V: 'a> {
-    nodes: tree::Nodes<'a, V>,
-    key: Vec<u8>,
-    key_offset: usize,
-}
-impl<'a, V: 'a> LabelIter<'a, V> {
-    fn new(nodes: tree::Nodes<'a, V>, key: Vec<u8>) -> Self {
-        let key_offset = key.len();
-        Self {
-            nodes,
-            key,
-            key_offset,
-        }
-    }
-}
-impl<'a, V: 'a> Iterator for LabelIter<'a, V> {
-    type Item = (Vec<u8>, Vec<u8>, &'a V);
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some((key_len, node)) = self.nodes.next() {
-            self.key.truncate(self.key_offset + key_len);
-            self.key.extend(node.label());
-            if let Some(value) = node.value() {
-                return Some((self.key.clone(), node.label().to_owned(), value));
-            }
-        }
-        None
-    }
-}
 
+/// An iterator over entries in `PatriciaMap` that collects all values up to
+/// until the key stops matching. Returns the portion of the key that matched
 #[derive(Debug)]
 pub struct CollectKeyIter<'a, 'b, V: 'a> {
     nodes: crate::node::CollectIter<'a, 'b, V>,

@@ -9,6 +9,7 @@ use std::iter::FromIterator;
 pub struct PatriciaSet {
     map: PatriciaMap<()>,
 }
+
 impl PatriciaSet {
     /// Makes a new empty `PatriciaSet` instance.
     ///

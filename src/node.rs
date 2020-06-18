@@ -1,5 +1,4 @@
 //! A node which represents a subtree of a patricia tree.
-use libc;
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
@@ -398,6 +397,31 @@ impl<V> Node<V> {
         }
     }
 
+    /// Returns an iterator that collects all items in the map up to a certain key
+    /// # Example
+    /// ```
+    /// use crate::patricia_tree::PatriciaMap;
+    /// let mut t = PatriciaMap::new();
+    /// t.insert("a", vec!["a"]);
+    /// t.insert("x", vec!["x"]);
+    /// t.insert("ab", vec!["b"]);
+    /// t.insert("abc", vec!["c"]);
+    /// t.insert("abcd", vec!["d"]);
+    /// t.insert("abcdf", vec!["f"]);
+    /// assert!(t
+    ///     .collect_iter(&"abcde")
+    ///     .map(|(_, v)| v)
+    ///     .flatten()
+    ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
+    /// ```
+
+    pub(crate) fn collect_iter<'a, 'b>(&'a self, key: &'b [u8]) -> CollectIter<'a, 'b, V> {
+        CollectIter {
+            key,
+            stack: vec![(0, 0, self)],
+        }
+    }
+
     pub(crate) fn get(&self, key: &[u8]) -> Option<&V> {
         let common_prefix_len = self.skip_common_prefix(key);
         let next = &key[common_prefix_len..];
@@ -468,6 +492,37 @@ impl<V> Node<V> {
             None
         }
     }
+
+    pub(crate) fn get_all_in_prefix<'a, 'b>(
+        &'a self,
+        key: &[u8],
+        offset: usize,
+        ret: &'b mut Vec<&'a V>,
+    ) -> Option<(usize, &Self)> {
+        let common_prefix_len = self.skip_common_prefix(key);
+        let next = &key[common_prefix_len..];
+        if next.is_empty() {
+            if let Some(v) = self.value() {
+                ret.push(v);
+            }
+            Some((common_prefix_len, self))
+        } else if common_prefix_len == self.label().len() {
+            let offset = offset + common_prefix_len;
+            if let Some(v) = self.value() {
+                ret.push(v);
+            }
+            let (o, n) = self
+                .child()
+                .and_then(|child| child.get_all_in_prefix(next, offset, ret))?;
+            Some((o, n))
+        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+            self.sibling()
+                .and_then(|sibling| sibling.get_all_in_prefix(next, offset, ret))
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn split_by_prefix(&mut self, prefix: &[u8]) -> Option<Self> {
         let common_prefix_len = self.skip_common_prefix(prefix);
         if common_prefix_len == prefix.len() {
@@ -680,51 +735,6 @@ impl<V> Node<V> {
     }
 }
 
-impl<V> Node<V>
-where
-    V: std::fmt::Debug,
-{
-    pub(crate) fn get_all_in<'a, 'b>(
-        &'a self,
-        key: &[u8],
-        offset: usize,
-        ret: &'b mut Vec<Option<&'a V>>,
-    ) -> Option<(usize, &Self)> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
-        // println!(
-        //     "next {:?} common_prefix_len {} label {:?}",
-        //     next,
-        //     common_prefix_len,
-        //     self.label(),
-        // );
-        if next.is_empty() {
-            ret.push(self.value());
-            Some((common_prefix_len, self))
-        } else if common_prefix_len == self.label().len() {
-            let offset = offset + common_prefix_len;
-            println!("offset {}", offset);
-            ret.push(self.value());
-            let (o, n) = self
-                .child()
-                .and_then(|child| child.get_all_in(next, offset, ret))?;
-            Some((o, n))
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
-            self.sibling()
-                .and_then(|sibling| sibling.get_all_in(next, offset, ret))
-        } else {
-            None
-        }
-    }
-
-    pub fn prefix_iter<'a, 'b>(&'a self, key: &'b [u8]) -> CollectIter<'a, 'b, V> {
-        CollectIter {
-            key,
-            stack: vec![(0, 0, self)],
-        }
-    }
-}
-
 impl<V> Drop for Node<V> {
     fn drop(&mut self) {
         unsafe {
@@ -779,6 +789,9 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
         }
     }
 }
+
+/// An iterator over entries in that collects all values up to
+/// until the key stops matching
 #[derive(Debug)]
 pub struct CollectIter<'a, 'b, V> {
     key: &'b [u8],
@@ -791,7 +804,6 @@ impl<'a, 'b, V> Iterator for CollectIter<'a, 'b, V> {
         if let Some((level, offset, node)) = self.stack.pop() {
             if let Some(sibling) = node.sibling() {
                 let common_prefix_len = sibling.skip_common_prefix(&self.key[offset..]);
-                // println!("cur sibling {:?}", &self.key[..common_prefix_len + offset]);
                 if sibling.label().len() == common_prefix_len {
                     self.stack
                         .push((level, common_prefix_len + offset, sibling));
@@ -799,7 +811,6 @@ impl<'a, 'b, V> Iterator for CollectIter<'a, 'b, V> {
             }
             if let Some(child) = node.child() {
                 let common_prefix_len = child.skip_common_prefix(&self.key[offset..]);
-                // println!("cur child {:?}", &self.key[..common_prefix_len + offset]);
                 if child.label().len() == common_prefix_len {
                     self.stack
                         .push((level + 1, common_prefix_len + offset, child));
@@ -807,14 +818,6 @@ impl<'a, 'b, V> Iterator for CollectIter<'a, 'b, V> {
             }
             if level != 0 {
                 let cur = &self.key[..offset];
-                // let next = &self.key[offset..];
-                // println!(
-                //     "cur {:?} next {:?} label {:?} offset {:?}",
-                //     cur,
-                //     next,
-                //     node.label(),
-                //     offset
-                // );
                 Some((level, cur, node))
             } else {
                 Some((level, &self.key, node))

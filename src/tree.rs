@@ -6,21 +6,6 @@ pub struct PatriciaTree<V> {
     len: usize,
 }
 
-impl<V> PatriciaTree<V>
-where
-    V: std::fmt::Debug,
-{
-    pub fn get_all_in<K: AsRef<[u8]>>(&self, key: K) -> Option<Vec<Option<&V>>> {
-        let mut ret = Vec::new();
-        self.root.get_all_in(key.as_ref(), 0, &mut ret);
-        Some(ret)
-    }
-
-    pub fn prefix_iter<'a, 'b>(&'a self, key: &'b [u8]) -> node::CollectIter<'a, 'b, V> {
-        self.root.prefix_iter(key.as_ref())
-    }
-}
-
 impl<V> PatriciaTree<V> {
     pub fn new() -> Self {
         PatriciaTree {
@@ -63,6 +48,15 @@ impl<V> PatriciaTree<V> {
         } else {
             None
         }
+    }
+    pub fn get_all_in_prefix<K: AsRef<[u8]>>(&self, key: K) -> Option<Vec<&V>> {
+        let mut ret = Vec::new();
+        self.root.get_all_in_prefix(key.as_ref(), 0, &mut ret);
+        Some(ret)
+    }
+
+    pub fn collect_iter<'a, 'b>(&'a self, key: &'b [u8]) -> node::CollectIter<'a, 'b, V> {
+        self.root.collect_iter(key.as_ref())
     }
     pub fn remove<K: AsRef<[u8]>>(&mut self, key: K) -> Option<V> {
         if let Some(old) = self.root.remove(key.as_ref()) {
