@@ -5,6 +5,22 @@ pub struct PatriciaTree<V> {
     root: Node<V>,
     len: usize,
 }
+
+impl<V> PatriciaTree<V>
+where
+    V: std::fmt::Debug,
+{
+    pub fn get_all_in<K: AsRef<[u8]>>(&self, key: K) -> Option<Vec<Option<&V>>> {
+        let mut ret = Vec::new();
+        self.root.get_all_in(key.as_ref(), 0, &mut ret);
+        Some(ret)
+    }
+
+    pub fn prefix_iter<'a, 'b>(&'a self, key: &'b [u8]) -> node::CollectIter<'a, 'b, V> {
+        self.root.prefix_iter(key.as_ref())
+    }
+}
+
 impl<V> PatriciaTree<V> {
     pub fn new() -> Self {
         PatriciaTree {

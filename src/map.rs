@@ -9,6 +9,22 @@ use std::iter::FromIterator;
 pub struct PatriciaMap<V> {
     tree: PatriciaTree<V>,
 }
+
+impl<V> PatriciaMap<V>
+where
+    V: std::fmt::Debug,
+{
+    pub fn get_all_in<K: AsRef<[u8]>>(&self, key: K) -> Option<Vec<Option<&V>>> {
+        self.tree.get_all_in(key.as_ref())
+    }
+    pub fn collect_iter<'a, 'b, K: AsRef<[u8]>>(&'a self, key: &'b K) -> CollectKeyIter<'a, 'b, V> {
+        let prefix_iter = self.tree.prefix_iter(key.as_ref());
+        CollectKeyIter::new(prefix_iter)
+    }
+    pub fn label_iter(&self) -> LabelIter<V> {
+        LabelIter::new(self.tree.nodes(), Vec::new())
+    }
+}
 impl<V> PatriciaMap<V> {
     /// Makes a new empty `PatriciaMap` instance.
     ///
@@ -435,6 +451,56 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
             self.key.extend(node.label());
             if let Some(value) = node.value() {
                 return Some((self.key.clone(), value));
+            }
+        }
+        None
+    }
+}
+#[derive(Debug)]
+pub struct LabelIter<'a, V: 'a> {
+    nodes: tree::Nodes<'a, V>,
+    key: Vec<u8>,
+    key_offset: usize,
+}
+impl<'a, V: 'a> LabelIter<'a, V> {
+    fn new(nodes: tree::Nodes<'a, V>, key: Vec<u8>) -> Self {
+        let key_offset = key.len();
+        Self {
+            nodes,
+            key,
+            key_offset,
+        }
+    }
+}
+impl<'a, V: 'a> Iterator for LabelIter<'a, V> {
+    type Item = (Vec<u8>, Vec<u8>, &'a V);
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((key_len, node)) = self.nodes.next() {
+            self.key.truncate(self.key_offset + key_len);
+            self.key.extend(node.label());
+            if let Some(value) = node.value() {
+                return Some((self.key.clone(), node.label().to_owned(), value));
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug)]
+pub struct CollectKeyIter<'a, 'b, V: 'a> {
+    nodes: crate::node::CollectIter<'a, 'b, V>,
+}
+impl<'a, 'b, V: 'a> CollectKeyIter<'a, 'b, V> {
+    fn new(nodes: crate::node::CollectIter<'a, 'b, V>) -> Self {
+        Self { nodes }
+    }
+}
+impl<'a, 'b, V: 'a> Iterator for CollectKeyIter<'a, 'b, V> {
+    type Item = (&'b [u8], &'a V);
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((_, k, v)) = self.nodes.next() {
+            if let Some(v) = v.value() {
+                return Some((k, v));
             }
         }
         None
