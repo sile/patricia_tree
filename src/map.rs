@@ -181,8 +181,7 @@ impl<V> PatriciaMap<V> {
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
     pub fn collect_iter<'a, 'b, K: AsRef<[u8]>>(&'a self, key: &'b K) -> CollectKeyIter<'a, 'b, V> {
-        let prefix_iter = self.tree.collect_iter(key.as_ref());
-        CollectKeyIter::new(prefix_iter)
+        CollectKeyIter::new(self.tree.collect_iter(key.as_ref()))
     }
 
     /// Splits the map into two at the given prefix.
