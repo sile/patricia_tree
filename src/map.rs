@@ -696,14 +696,15 @@ mod tests {
         t.insert("..", vec!["e"]);
         t.insert("x", vec!["d"]);
 
-        // let results = t
-        //     .common_prefixes_iter(&".com.foo.bar.baz.")
-        //     .map(|(_, v)| v)
-        //     .flatten()
-        //     .cloned()
-        //     .collect::<Vec<_>>();
-        // dbg!(&results);
-        // assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
+        let results = t
+            .common_prefixes_iter(&".com.foo.bar.baz.")
+            .map(|(_, v)| v)
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        dbg!(&results);
+
+        assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
 
         let results = t
             .get_common_prefixes(&".com.foo.bar.baz.")
@@ -753,14 +754,15 @@ mod tests {
         t.insert("abc", vec!["c"]);
         t.insert("..", vec!["e"]);
         t.insert("x", vec!["d"]);
-        // let results = t
-        //     .common_prefixes_iter(&"abcd")
-        //     .map(|(_, v)| v)
-        //     .flatten()
-        //     .cloned()
-        //     .collect::<Vec<_>>();
 
-        // assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
+        let results = t
+            .common_prefixes_iter(&"abcd")
+            .map(|(_, v)| v)
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
 
         // recursive
         let results = t
