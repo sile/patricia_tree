@@ -421,7 +421,7 @@ impl<V> Node<V> {
     ) -> CommonPrefixesIter<'a, 'b, V> {
         CommonPrefixesIter {
             key,
-            stack: vec![(0, 0, false, true, self)],
+            stack: vec![(0, 0, true, true, self)],
         }
     }
 

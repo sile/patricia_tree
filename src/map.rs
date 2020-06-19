@@ -716,6 +716,25 @@ mod tests {
     }
 
     #[test]
+    fn test_letter_prefixes() {
+        let mut t = PatriciaMap::new();
+        t.insert("x", vec!["x"]);
+        t.insert("a", vec!["a"]);
+        t.insert("ab", vec!["b"]);
+        t.insert("abc", vec!["c"]);
+        t.insert("abcd", vec!["d"]);
+        t.insert("abcdf", vec!["f"]);
+
+        let results = t
+            .common_prefixes_iter(&"abcde")
+            .map(|(_, v)| v)
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(results.iter().eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
+    }
+
+    #[test]
     fn test_common_prefixes() {
         let mut t = PatriciaMap::new();
         t.insert("b", vec!["b"]);
