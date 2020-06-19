@@ -49,14 +49,17 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
-    pub fn get_all_in_prefix<K: AsRef<[u8]>>(&self, key: K) -> Option<Vec<&V>> {
+    pub fn get_common_prefixes<K: AsRef<[u8]>>(&self, key: K) -> Vec<&V> {
         let mut ret = Vec::new();
-        self.root.get_all_in_prefix(key.as_ref(), 0, &mut ret);
-        Some(ret)
+        self.root.get_common_prefixes(key.as_ref(), 0, &mut ret);
+        ret
     }
 
-    pub fn collect_iter<'a, 'b>(&'a self, key: &'b [u8]) -> node::CollectIter<'a, 'b, V> {
-        self.root.collect_iter(key.as_ref())
+    pub fn common_prefixes_iter<'a, 'b>(
+        &'a self,
+        key: &'b [u8],
+    ) -> node::CommonPrefixesIter<'a, 'b, V> {
+        self.root.common_prefixes_iter(key.as_ref())
     }
     pub fn remove<K: AsRef<[u8]>>(&mut self, key: K) -> Option<V> {
         if let Some(old) = self.root.remove(key.as_ref()) {

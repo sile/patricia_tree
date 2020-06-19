@@ -160,8 +160,8 @@ impl<V> PatriciaMap<V> {
 
     /// Similar to `collect_iter` but calls recursively and returns all values in
     /// a `Vec`, without the key that it matched on
-    pub fn get_all_in_prefix<K: AsRef<[u8]>>(&self, key: K) -> Option<Vec<&V>> {
-        self.tree.get_all_in_prefix(key.as_ref())
+    pub fn get_common_prefixes<K: AsRef<[u8]>>(&self, key: K) -> Vec<&V> {
+        self.tree.get_common_prefixes(key.as_ref())
     }
     /// Returns an iterator that collects all items in the map up to a certain key
     /// # Example
@@ -180,8 +180,11 @@ impl<V> PatriciaMap<V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn collect_iter<'a, 'b, K: AsRef<[u8]>>(&'a self, key: &'b K) -> CollectKeyIter<'a, 'b, V> {
-        CollectKeyIter::new(self.tree.collect_iter(key.as_ref()))
+    pub fn common_prefixes_iter<'a, 'b, K: AsRef<[u8]>>(
+        &'a self,
+        key: &'b K,
+    ) -> CommonPrefixesKeyIter<'a, 'b, V> {
+        CommonPrefixesKeyIter::new(self.tree.common_prefixes_iter(key.as_ref()))
     }
 
     /// Splits the map into two at the given prefix.
@@ -471,15 +474,15 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
 /// An iterator over entries in `PatriciaMap` that collects all values up to
 /// until the key stops matching. Returns the portion of the key that matched
 #[derive(Debug)]
-pub struct CollectKeyIter<'a, 'b, V: 'a> {
-    nodes: crate::node::CollectIter<'a, 'b, V>,
+pub struct CommonPrefixesKeyIter<'a, 'b, V: 'a> {
+    nodes: crate::node::CommonPrefixesIter<'a, 'b, V>,
 }
-impl<'a, 'b, V: 'a> CollectKeyIter<'a, 'b, V> {
-    fn new(nodes: crate::node::CollectIter<'a, 'b, V>) -> Self {
+impl<'a, 'b, V: 'a> CommonPrefixesKeyIter<'a, 'b, V> {
+    fn new(nodes: crate::node::CommonPrefixesIter<'a, 'b, V>) -> Self {
         Self { nodes }
     }
 }
-impl<'a, 'b, V: 'a> Iterator for CollectKeyIter<'a, 'b, V> {
+impl<'a, 'b, V: 'a> Iterator for CommonPrefixesKeyIter<'a, 'b, V> {
     type Item = (&'b [u8], &'a V);
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((_, k, v)) = self.nodes.next() {
@@ -682,5 +685,90 @@ mod tests {
         for &(ref k, v) in input.iter() {
             assert_eq!(map.get(k), Some(&v));
         }
+    }
+
+    #[test]
+    fn test_common_word_prefixes() {
+        let mut t = PatriciaMap::new();
+        t.insert(".com.foo.", vec!["b"]);
+        t.insert(".", vec!["a"]);
+        t.insert(".com.foo.bar.", vec!["c"]);
+        t.insert("..", vec!["e"]);
+        t.insert("x", vec!["d"]);
+
+        // let results = t
+        //     .common_prefixes_iter(&".com.foo.bar.baz.")
+        //     .map(|(_, v)| v)
+        //     .flatten()
+        //     .cloned()
+        //     .collect::<Vec<_>>();
+        // dbg!(&results);
+        // assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
+
+        let results = t
+            .get_common_prefixes(&".com.foo.bar.baz.")
+            .into_iter()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
+    }
+
+    #[test]
+    fn test_common_prefixes() {
+        let mut t = PatriciaMap::new();
+        t.insert("b", vec!["b"]);
+        t.insert("a", vec!["a"]);
+        t.insert("c", vec!["c"]);
+        t.insert("..", vec!["e"]);
+        t.insert("x", vec!["d"]);
+
+        let results = t
+            .common_prefixes_iter(&"abc")
+            .map(|(k, v)| {
+                unsafe {
+                    println!("{:?}", std::str::from_utf8_unchecked(k));
+                }
+                v
+            })
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        dbg!(&results);
+        assert!(results.iter().eq(vec![&"a"].into_iter()));
+
+        // recursive
+        let results = t
+            .get_common_prefixes(&"abc")
+            .into_iter()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        dbg!(&results);
+        assert!(results.iter().eq(vec![&"a"].into_iter()));
+
+        let mut t = PatriciaMap::new();
+        t.insert("ab", vec!["b"]);
+        t.insert("a", vec!["a"]);
+        t.insert("abc", vec!["c"]);
+        t.insert("..", vec!["e"]);
+        t.insert("x", vec!["d"]);
+        // let results = t
+        //     .common_prefixes_iter(&"abcd")
+        //     .map(|(_, v)| v)
+        //     .flatten()
+        //     .cloned()
+        //     .collect::<Vec<_>>();
+
+        // assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
+
+        // recursive
+        let results = t
+            .get_common_prefixes(&"abcd")
+            .into_iter()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
     }
 }
