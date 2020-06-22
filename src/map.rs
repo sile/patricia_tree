@@ -180,11 +180,11 @@ impl<V> PatriciaMap<V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefixes_iter<'a, 'b, K: AsRef<[u8]>>(
+    pub fn common_prefixes_iter<'a, 'b>(
         &'a self,
-        key: &'b K,
+        key: &'b [u8],
     ) -> CommonPrefixesKeyIter<'a, 'b, V> {
-        CommonPrefixesKeyIter::new(self.tree.common_prefixes_iter(key.as_ref()))
+        CommonPrefixesKeyIter::new(self.tree.common_prefixes_iter(key))
     }
 
     /// Splits the map into two at the given prefix.
@@ -485,7 +485,7 @@ impl<'a, 'b, V: 'a> CommonPrefixesKeyIter<'a, 'b, V> {
 impl<'a, 'b, V: 'a> Iterator for CommonPrefixesKeyIter<'a, 'b, V> {
     type Item = (&'b [u8], &'a V);
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((_, k, v)) = self.nodes.next() {
+        while let Some((k, v)) = self.nodes.next() {
             if let Some(v) = v.value() {
                 return Some((k, v));
             }
@@ -697,17 +697,16 @@ mod tests {
         t.insert("x", vec!["d"]);
 
         let results = t
-            .common_prefixes_iter(&".com.foo.bar.baz.")
+            .common_prefixes_iter(b".com.foo.bar.baz.")
             .map(|(_, v)| v)
             .flatten()
             .cloned()
             .collect::<Vec<_>>();
-        dbg!(&results);
 
         assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
 
         let results = t
-            .get_common_prefixes(&".com.foo.bar.baz.")
+            .get_common_prefixes(b".com.foo.bar.baz.")
             .into_iter()
             .flatten()
             .cloned()
@@ -726,7 +725,7 @@ mod tests {
         t.insert("abcdf", vec!["f"]);
 
         let results = t
-            .common_prefixes_iter(&"abcde")
+            .common_prefixes_iter(b"abcde")
             .map(|(_, v)| v)
             .flatten()
             .cloned()
@@ -744,7 +743,7 @@ mod tests {
         t.insert("x", vec!["d"]);
 
         let results = t
-            .common_prefixes_iter(&"abc")
+            .common_prefixes_iter(b"abc")
             .map(|(k, v)| {
                 unsafe {
                     println!("{:?}", std::str::from_utf8_unchecked(k));
@@ -764,7 +763,7 @@ mod tests {
             .flatten()
             .cloned()
             .collect::<Vec<_>>();
-        dbg!(&results);
+
         assert!(results.iter().eq(vec![&"a"].into_iter()));
 
         let mut t = PatriciaMap::new();
@@ -775,7 +774,7 @@ mod tests {
         t.insert("x", vec!["d"]);
 
         let results = t
-            .common_prefixes_iter(&"abcd")
+            .common_prefixes_iter(b"abcd")
             .map(|(_, v)| v)
             .flatten()
             .cloned()
@@ -791,5 +790,22 @@ mod tests {
             .cloned()
             .collect::<Vec<_>>();
         assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
+
+        let mut list = PatriciaMap::new();
+        list.insert(b".com.foocatnetworks.".as_ref(), vec![0 as u16]);
+        list.insert(b".com.foocatnetworks.foo.".as_ref(), vec![1]);
+        list.insert(b".com.foocatnetworks.foo.baz.".as_ref(), vec![2]);
+        list.insert(b".com.google.".as_ref(), vec![0]);
+        list.insert(b".com.cisco.".as_ref(), vec![0]);
+        list.insert(b".org.wikipedia.".as_ref(), vec![0]);
+
+        let results = list
+            .common_prefixes_iter(b".com.foocatnetworks.foo.baz.")
+            .map(|(_, v)| v)
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        assert!(vec![0 as u16, 1, 2].into_iter().eq(results.into_iter()));
     }
 }

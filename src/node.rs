@@ -421,7 +421,7 @@ impl<V> Node<V> {
     ) -> CommonPrefixesIter<'a, 'b, V> {
         CommonPrefixesIter {
             key,
-            stack: vec![(0, 0, true, true, self)],
+            stack: vec![(0, self)],
         }
     }
 
@@ -798,115 +798,26 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
 #[derive(Debug)]
 pub struct CommonPrefixesIter<'a, 'b, V> {
     key: &'b [u8],
-    stack: Vec<(usize, usize, bool, bool, &'a Node<V>)>,
+    stack: Vec<(usize, &'a Node<V>)>,
 }
 
-// impl<'a, 'b, V> Iterator for CommonPrefixesIter<'a, 'b, V> {
-//     type Item = (usize, &'b [u8], &'a Node<V>);
-//     fn next(&mut self) -> Option<Self::Item> {
-//         while let Some((level, offset, node)) = self.stack.pop() {
-//             println!("key {:?} label {:?}", &self.key[offset..], node.label());
-//             if let Some(sibling) = node.sibling() {
-//                 let common_prefix_len = sibling.skip_common_prefix(&self.key[offset..]);
-//                 println!(
-//                     "sibling common_prefix {:?} label {:?}",
-//                     common_prefix_len,
-//                     sibling.label()
-//                 );
-//                 println!(
-//                     "get {:?} key offset {:?}",
-//                     node.label().get(0),
-//                     self.key.get(offset)
-//                 );
-//                 if sibling.label().len() == common_prefix_len {
-//                     self.stack
-//                         .push((level, common_prefix_len + offset, sibling));
-//                 }
-//                 //else if common_prefix_len == 0 && node.label().get(0) <= self.key.get(offset) {
-//                 //     println!(
-//                 //         "pushing sibling {:?} {:?}",
-//                 //         node.label().get(0),
-//                 //         self.key.get(offset)
-//                 //     );
-//                 //     self.stack.push((level, offset, sibling));
-//                 // }
-//             }
-//             if let Some(child) = node.child() {
-//                 let common_prefix_len = child.skip_common_prefix(&self.key[offset..]);
-//                 println!(
-//                     "child common_prefix {:?} label {:?}",
-//                     common_prefix_len,
-//                     child.label(),
-//                 );
-//                 if child.label().len() == common_prefix_len {
-//                     self.stack
-//                         .push((level + 1, common_prefix_len + offset, child));
-//                 }
-//             }
-//             if level == 0 {
-//                 return Some((level, &self.key, node));
-//             } else {
-//                 let cur = &self.key[..offset];
-//                 return Some((level, cur, node));
-//             }
-//         }
-//         None
-//     }
-// }
-
 impl<'a, 'b, V> Iterator for CommonPrefixesIter<'a, 'b, V> {
-    type Item = (usize, &'b [u8], &'a Node<V>);
+    type Item = (&'b [u8], &'a Node<V>);
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((level, offset, sibling_bool, child_bool, node)) = self.stack.pop() {
-            // println!("offset {:?}", offset,);
+        while let Some((offset, node)) = self.stack.pop() {
             let common_prefix_len = node.skip_common_prefix(&self.key[offset..]);
-            let new_offset = common_prefix_len + offset;
-            // unsafe {
-            //     println!(
-            //         "common_prefix_len {:?} key {:?} current match {:?}",
-            //         common_prefix_len,
-            //         std::str::from_utf8_unchecked(&self.key[offset..]),
-            //         std::str::from_utf8_unchecked(&self.key[..new_offset])
-            //     );
-            // }
-            if let Some(sibling) = node.sibling() {
-                // unsafe {
-                //     println!(
-                //         "push sibling {:?}",
-                //         std::str::from_utf8_unchecked(&sibling.label())
-                //     );
-                // }
-                self.stack.push((
-                    level,
-                    new_offset,
-                    sibling.skip_common_prefix(&self.key[offset..]) != 0,
-                    child_bool,
-                    sibling,
-                ));
+            if common_prefix_len == 0 && node.label().get(0) <= self.key.get(offset) {
+                if let Some(sibling) = node.sibling() {
+                    self.stack.push((offset, sibling));
+                }
             }
-            if let Some(child) = node.child() {
-                // unsafe {
-                //     println!(
-                //         "push child {:?} with len {:?}",
-                //         std::str::from_utf8_unchecked(&child.label()),
-                //         child.label_len()
-                //     );
-                // }
-                self.stack.push((
-                    level + 1,
-                    new_offset,
-                    sibling_bool,
-                    child.skip_common_prefix(&self.key[offset..]) != 0,
-                    child,
-                ));
-            }
-            // println!("node.label {:?} new_offset {:?}", node.label(), new_offset);
-            if level == 0 {
-                // println!("level 0");
-                return Some((level, &self.key, node));
-            } else if common_prefix_len == node.label().len() && (sibling_bool || child_bool) {
-                let cur = &self.key[..new_offset];
-                return Some((level, cur, node));
+
+            if common_prefix_len == node.label().len() {
+                let prefix_len = offset + common_prefix_len;
+                if let Some(child) = node.child() {
+                    self.stack.push((prefix_len, child));
+                }
+                return Some((&self.key[..prefix_len], node));
             }
         }
         None
