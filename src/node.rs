@@ -408,19 +408,20 @@ impl<V> Node<V> {
     /// t.insert("abc", vec!["c"]);
     /// t.insert("abcd", vec!["d"]);
     /// t.insert("abcdf", vec!["f"]);
+    ///
     /// assert!(t
-    ///     .collect_iter(&"abcde")
+    ///     .common_prefixes(b"abcde")
     ///     .map(|(_, v)| v)
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
 
-    pub(crate) fn common_prefixes_iter<'a, 'b>(
+    pub(crate) fn common_prefixes<'a, 'b, K: AsRef<[u8]> + ?Sized>(
         &'a self,
-        key: &'b [u8],
+        key: &'b K,
     ) -> CommonPrefixesIter<'a, 'b, V> {
         CommonPrefixesIter {
-            key,
+            key: key.as_ref(),
             stack: vec![(0, self)],
         }
     }

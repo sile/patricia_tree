@@ -175,16 +175,19 @@ impl<V> PatriciaMap<V> {
     /// t.insert("abcd", vec!["d"]);
     /// t.insert("abcdf", vec!["f"]);
     /// assert!(t
-    ///     .collect_iter(&"abcde")
+    ///     .common_prefixes(b"abcde")
     ///     .map(|(_, v)| v)
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefixes_iter<'a, 'b>(
+    pub fn common_prefixes<'a, 'b>(
         &'a self,
         key: &'b [u8],
-    ) -> CommonPrefixesKeyIter<'a, 'b, V> {
-        CommonPrefixesKeyIter::new(self.tree.common_prefixes_iter(key))
+    ) -> impl Iterator<Item = (&'b [u8], &'a V)>
+    where
+        'a: 'b,
+    {
+        CommonPrefixesKeyIter::new(self.tree.common_prefixes(key))
     }
 
     /// Splits the map into two at the given prefix.
@@ -586,7 +589,6 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand;
     use rand::seq::SliceRandom;
 
     #[test]
@@ -697,7 +699,7 @@ mod tests {
         t.insert("x", vec!["d"]);
 
         let results = t
-            .common_prefixes_iter(b".com.foo.bar.baz.")
+            .common_prefixes(b".com.foo.bar.baz.")
             .map(|(_, v)| v)
             .flatten()
             .cloned()
@@ -725,7 +727,7 @@ mod tests {
         t.insert("abcdf", vec!["f"]);
 
         let results = t
-            .common_prefixes_iter(b"abcde")
+            .common_prefixes(b"abcde")
             .map(|(_, v)| v)
             .flatten()
             .cloned()
@@ -743,7 +745,7 @@ mod tests {
         t.insert("x", vec!["d"]);
 
         let results = t
-            .common_prefixes_iter(b"abc")
+            .common_prefixes(b"abc")
             .map(|(k, v)| {
                 unsafe {
                     println!("{:?}", std::str::from_utf8_unchecked(k));
@@ -774,7 +776,7 @@ mod tests {
         t.insert("x", vec!["d"]);
 
         let results = t
-            .common_prefixes_iter(b"abcd")
+            .common_prefixes(b"abcd")
             .map(|(_, v)| v)
             .flatten()
             .cloned()
@@ -800,7 +802,7 @@ mod tests {
         list.insert(b".org.wikipedia.".as_ref(), vec![0]);
 
         let results = list
-            .common_prefixes_iter(b".com.foocatnetworks.foo.baz.")
+            .common_prefixes(b".com.foocatnetworks.foo.baz.")
             .map(|(_, v)| v)
             .flatten()
             .cloned()
