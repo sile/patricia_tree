@@ -1,7 +1,4 @@
 //! `cargo run --example encode --features binary-format < INPUT_FILE > OUTPUT_FILE`
-extern crate bytecodec;
-extern crate patricia_tree;
-
 use bytecodec::io::IoEncodeExt;
 use bytecodec::null::NullEncoder;
 use bytecodec::Encode;

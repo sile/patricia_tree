@@ -30,3 +30,18 @@ rand = "0.7"
 
 [package.metadata.docs.rs]
 all-features = true
+
+[[example]]
+name = "decode"
+path = "examples/decode.rs"
+required-features = ["binary-format"]
+
+[[example]]
+name = "encode"
+path = "examples/encode.rs"
+required-features = ["binary-format"]
+
+[[example]]
+name = "insert_lines"
+path = "examples/insert_lines.rs"
+dependencies = ["clap"]
