@@ -158,11 +158,6 @@ impl<V> PatriciaMap<V> {
         self.tree.remove(key)
     }
 
-    /// Similar to `collect_iter` but calls recursively and returns all values in
-    /// a `Vec`, without the key that it matched on
-    pub fn get_common_prefixes<K: AsRef<[u8]>>(&self, key: K) -> Vec<&V> {
-        self.tree.get_common_prefixes(key.as_ref())
-    }
     /// Returns an iterator that collects all items in the map up to a certain key
     /// # Example
     /// ```
@@ -706,14 +701,6 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
-
-        let results = t
-            .get_common_prefixes(b".com.foo.bar.baz.")
-            .into_iter()
-            .flatten()
-            .cloned()
-            .collect::<Vec<_>>();
-        assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
     }
 
     #[test]
@@ -758,16 +745,6 @@ mod tests {
         dbg!(&results);
         assert!(results.iter().eq(vec![&"a"].into_iter()));
 
-        // recursive
-        let results = t
-            .get_common_prefixes(&"abc")
-            .into_iter()
-            .flatten()
-            .cloned()
-            .collect::<Vec<_>>();
-
-        assert!(results.iter().eq(vec![&"a"].into_iter()));
-
         let mut t = PatriciaMap::new();
         t.insert("ab", vec!["b"]);
         t.insert("a", vec!["a"]);
@@ -782,15 +759,6 @@ mod tests {
             .cloned()
             .collect::<Vec<_>>();
 
-        assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
-
-        // recursive
-        let results = t
-            .get_common_prefixes(&"abcd")
-            .into_iter()
-            .flatten()
-            .cloned()
-            .collect::<Vec<_>>();
         assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
 
         let mut list = PatriciaMap::new();

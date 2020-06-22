@@ -497,36 +497,6 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn get_common_prefixes<'a, 'b>(
-        &'a self,
-        key: &[u8],
-        offset: usize,
-        ret: &'b mut Vec<&'a V>,
-    ) -> Option<(usize, &Self)> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
-        if next.is_empty() {
-            if let Some(v) = self.value() {
-                ret.push(v);
-            }
-            Some((common_prefix_len, self))
-        } else if common_prefix_len == self.label().len() {
-            let offset = offset + common_prefix_len;
-            if let Some(v) = self.value() {
-                ret.push(v);
-            }
-            let (o, n) = self
-                .child()
-                .and_then(|child| child.get_common_prefixes(next, offset, ret))?;
-            Some((o, n))
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
-            self.sibling()
-                .and_then(|sibling| sibling.get_common_prefixes(next, offset, ret))
-        } else {
-            None
-        }
-    }
-
     pub(crate) fn split_by_prefix(&mut self, prefix: &[u8]) -> Option<Self> {
         let common_prefix_len = self.skip_common_prefix(prefix);
         if common_prefix_len == prefix.len() {

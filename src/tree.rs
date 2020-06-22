@@ -49,12 +49,6 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
-    pub fn get_common_prefixes<K: AsRef<[u8]>>(&self, key: K) -> Vec<&V> {
-        let mut ret = Vec::new();
-        self.root.get_common_prefixes(key.as_ref(), 0, &mut ret);
-        ret
-    }
-
     pub fn common_prefixes<'a, 'b>(&'a self, key: &'b [u8]) -> node::CommonPrefixesIter<'a, 'b, V> {
         self.root.common_prefixes(key.as_ref())
     }
