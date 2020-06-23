@@ -44,4 +44,3 @@ required-features = ["binary-format"]
 [[example]]
 name = "insert_lines"
 path = "examples/insert_lines.rs"
-dependencies = ["clap"]
