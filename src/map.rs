@@ -158,8 +158,10 @@ impl<V> PatriciaMap<V> {
         self.tree.remove(key)
     }
 
-    /// Returns an iterator that collects all items in the map up to a certain key
+    /// Returns an iterator that collects all entries in the map up to a certain key.
+    ///
     /// # Example
+    ///
     /// ```
     /// use patricia_tree::PatriciaMap;
     /// let mut t = PatriciaMap::new();
@@ -178,15 +180,19 @@ impl<V> PatriciaMap<V> {
     pub fn common_prefixes<'a, 'b>(
         &'a self,
         key: &'b [u8],
-    ) -> impl Iterator<Item = (&'b [u8], &'a V)>
+    ) -> impl 'b + Iterator<Item = (&'b [u8], &'a V)>
     where
         'a: 'b,
     {
-        CommonPrefixesKeyIter::new(self.tree.common_prefixes(key))
+        self.tree
+            .common_prefixes(key)
+            .filter_map(move |(prefix_len, n)| n.value().map(|v| (&key[..prefix_len], v)))
     }
 
-    /// Returns an iterator that collects all items in the map up to a certain key
+    /// Returns an iterator that collects all values of entries in the map up to a certain key.
+    ///
     /// # Example
+    ///
     /// ```
     /// use patricia_tree::PatriciaMap;
     /// let mut t = PatriciaMap::new();
@@ -197,12 +203,14 @@ impl<V> PatriciaMap<V> {
     /// t.insert("abcd", vec!["d"]);
     /// t.insert("abcdf", vec!["f"]);
     /// assert!(t
-    ///     .common_prefixes_val(b"abcde")
+    ///     .common_prefix_values(b"abcde")
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefixes_val<'a, 'b>(&'a self, key: &'b [u8]) -> impl Iterator<Item = &'a V> {
-        CommonPrefixesValIter::new(self.tree.common_prefixes_val(key))
+    pub fn common_prefix_values<'a>(&'a self, key: &[u8]) -> impl 'a + Iterator<Item = &'a V> {
+        self.tree
+            .common_prefixes(key.to_owned())
+            .filter_map(|(_, n)| n.value())
     }
 
     /// Splits the map into two at the given prefix.
@@ -483,52 +491,6 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
             self.key.extend(node.label());
             if let Some(value) = node.value() {
                 return Some((self.key.clone(), value));
-            }
-        }
-        None
-    }
-}
-
-/// An iterator over entries in `PatriciaMap` that collects all values up to
-/// until the key stops matching. Returns the portion of the key that matched
-#[derive(Debug)]
-pub struct CommonPrefixesKeyIter<'a, 'b, V: 'a> {
-    nodes: crate::node::CommonPrefixesIter<'a, 'b, V>,
-}
-impl<'a, 'b, V: 'a> CommonPrefixesKeyIter<'a, 'b, V> {
-    fn new(nodes: crate::node::CommonPrefixesIter<'a, 'b, V>) -> Self {
-        Self { nodes }
-    }
-}
-impl<'a, 'b, V: 'a> Iterator for CommonPrefixesKeyIter<'a, 'b, V> {
-    type Item = (&'b [u8], &'a V);
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some((k, v)) = self.nodes.next() {
-            if let Some(v) = v.value() {
-                return Some((k, v));
-            }
-        }
-        None
-    }
-}
-
-/// An iterator over entries in `PatriciaMap` that collects all values up to
-/// until the key stops matching. Returns the portion of the key that matched
-#[derive(Debug)]
-pub struct CommonPrefixesValIter<'a, V: 'a> {
-    nodes: crate::node::CommonPrefixesValIter<'a, V>,
-}
-impl<'a, 'b, V: 'a> CommonPrefixesValIter<'a, V> {
-    fn new(nodes: crate::node::CommonPrefixesValIter<'a, V>) -> Self {
-        Self { nodes }
-    }
-}
-impl<'a, V: 'a> Iterator for CommonPrefixesValIter<'a, V> {
-    type Item = &'a V;
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some(v) = self.nodes.next() {
-            if let Some(v) = v.value() {
-                return Some(v);
             }
         }
         None

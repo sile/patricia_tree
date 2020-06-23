@@ -49,14 +49,11 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
-    pub fn common_prefixes<'a, 'b>(&'a self, key: &'b [u8]) -> node::CommonPrefixesIter<'a, 'b, V> {
-        self.root.common_prefixes(key.as_ref())
-    }
-    pub fn common_prefixes_val<'a, 'b>(
-        &'a self,
-        key: &'b [u8],
-    ) -> node::CommonPrefixesValIter<'a, V> {
-        self.root.common_prefixes_val(key.as_ref())
+    pub(crate) fn common_prefixes<'a, K>(&'a self, key: K) -> node::CommonPrefixesIter<'a, K, V>
+    where
+        K: AsRef<[u8]>,
+    {
+        self.root.common_prefixes(key)
     }
     pub fn remove<K: AsRef<[u8]>>(&mut self, key: K) -> Option<V> {
         if let Some(old) = self.root.remove(key.as_ref()) {

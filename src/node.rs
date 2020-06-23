@@ -397,59 +397,12 @@ impl<V> Node<V> {
         }
     }
 
-    /// Returns an iterator that collects all items in the map up to a certain key
-    /// # Example
-    /// ```
-    /// use crate::patricia_tree::PatriciaMap;
-    /// let mut t = PatriciaMap::new();
-    /// t.insert("a", vec!["a"]);
-    /// t.insert("x", vec!["x"]);
-    /// t.insert("ab", vec!["b"]);
-    /// t.insert("abc", vec!["c"]);
-    /// t.insert("abcd", vec!["d"]);
-    /// t.insert("abcdf", vec!["f"]);
-    ///
-    /// assert!(t
-    ///     .common_prefixes(b"abcde")
-    ///     .map(|(_, v)| v)
-    ///     .flatten()
-    ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
-    /// ```
-
-    pub(crate) fn common_prefixes<'a, 'b, K: AsRef<[u8]> + ?Sized>(
-        &'a self,
-        key: &'b K,
-    ) -> CommonPrefixesIter<'a, 'b, V> {
+    pub(crate) fn common_prefixes<'a, K>(&'a self, key: K) -> CommonPrefixesIter<'a, K, V>
+    where
+        K: AsRef<[u8]>,
+    {
         CommonPrefixesIter {
-            key: key.as_ref(),
-            stack: vec![(0, self)],
-        }
-    }
-
-    /// Returns an iterator that collects all items in the map up to a certain key
-    /// # Example
-    /// ```
-    /// use crate::patricia_tree::PatriciaMap;
-    /// let mut t = PatriciaMap::new();
-    /// t.insert("a", vec!["a"]);
-    /// t.insert("x", vec!["x"]);
-    /// t.insert("ab", vec!["b"]);
-    /// t.insert("abc", vec!["c"]);
-    /// t.insert("abcd", vec!["d"]);
-    /// t.insert("abcdf", vec!["f"]);
-    ///
-    /// assert!(t
-    ///     .common_prefixes_val(b"abcde")
-    ///     .flatten()
-    ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
-    /// ```
-
-    pub(crate) fn common_prefixes_val<'a, 'b, K: AsRef<[u8]> + ?Sized>(
-        &'a self,
-        key: &'b K,
-    ) -> CommonPrefixesValIter<'a, V> {
-        CommonPrefixesValIter {
-            key: key.as_ref().to_owned(),
+            key,
             stack: vec![(0, self)],
         }
     }
@@ -793,19 +746,22 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
 }
 
 /// An iterator over entries in that collects all values up to
-/// until the key stops matching
+/// until the key stops matching.
 #[derive(Debug)]
-pub struct CommonPrefixesIter<'a, 'b, V> {
-    key: &'b [u8],
+pub(crate) struct CommonPrefixesIter<'a, K, V> {
+    key: K,
     stack: Vec<(usize, &'a Node<V>)>,
 }
 
-impl<'a, 'b, V> Iterator for CommonPrefixesIter<'a, 'b, V> {
-    type Item = (&'b [u8], &'a Node<V>);
+impl<'a, K, V> Iterator for CommonPrefixesIter<'a, K, V>
+where
+    K: AsRef<[u8]>,
+{
+    type Item = (usize, &'a Node<V>);
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((offset, node)) = self.stack.pop() {
-            let common_prefix_len = node.skip_common_prefix(&self.key[offset..]);
-            if common_prefix_len == 0 && node.label().get(0) <= self.key.get(offset) {
+            let common_prefix_len = node.skip_common_prefix(&self.key.as_ref()[offset..]);
+            if common_prefix_len == 0 && node.label().get(0) <= self.key.as_ref().get(offset) {
                 if let Some(sibling) = node.sibling() {
                     self.stack.push((offset, sibling));
                 }
@@ -816,38 +772,7 @@ impl<'a, 'b, V> Iterator for CommonPrefixesIter<'a, 'b, V> {
                 if let Some(child) = node.child() {
                     self.stack.push((prefix_len, child));
                 }
-                return Some((&self.key[..prefix_len], node));
-            }
-        }
-        None
-    }
-}
-
-/// An iterator over entries in that collects all values up to
-/// until the key stops matching, doesn't provide the matching key portion
-#[derive(Debug)]
-pub struct CommonPrefixesValIter<'a, V> {
-    key: Vec<u8>,
-    stack: Vec<(usize, &'a Node<V>)>,
-}
-
-impl<'a, V> Iterator for CommonPrefixesValIter<'a, V> {
-    type Item = &'a Node<V>;
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some((offset, node)) = self.stack.pop() {
-            let common_prefix_len = node.skip_common_prefix(&self.key[offset..]);
-            if common_prefix_len == 0 && node.label().get(0) <= self.key.get(offset) {
-                if let Some(sibling) = node.sibling() {
-                    self.stack.push((offset, sibling));
-                }
-            }
-
-            if common_prefix_len == node.label().len() {
-                let prefix_len = offset + common_prefix_len;
-                if let Some(child) = node.child() {
-                    self.stack.push((prefix_len, child));
-                }
-                return Some(node);
+                return Some((prefix_len, node));
             }
         }
         None
