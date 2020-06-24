@@ -1,4 +1,5 @@
 //! A node which represents a subtree of a patricia tree.
+use std::alloc::{self, Layout};
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
@@ -32,7 +33,8 @@ pub use crate::codec::{NodeDecoder, NodeEncoder};
 
 const FLAGS_OFFSET: isize = 0;
 const LABEL_LEN_OFFSET: isize = 1;
-const LABEL_OFFSET: isize = 2;
+const LAYOUT_OFFSET: isize = 2;
+const LABEL_OFFSET: isize = 4;
 
 const MAX_LABEL_LEN: usize = 255;
 
@@ -45,6 +47,7 @@ pub struct Node<V> {
     // layout:
     //   - flags: u8
     //   - label_len: u8
+    //   - layout: Layout
     //   - label: [u8; label_len]
     //   - value: Option<V>
     //   - child: Option<Node<V>>
@@ -127,12 +130,17 @@ impl<V> Node<V> {
             flags.insert(Flags::SIBLING_ALLOCATED | Flags::SIBLING_INITIALIZED);
             block_size += mem::size_of::<Self>();
         }
-        let ptr = unsafe { libc::malloc(block_size) } as *mut u8;
+
+        block_size += mem::size_of::<Layout>();
+
+        let layout = Layout::array::<u8>(block_size).expect("Failed to get layout");
+        let ptr = unsafe { alloc::alloc(layout) as *mut u8 };
         assert_ne!(ptr, ptr::null_mut());
 
         unsafe {
             ptr::write(ptr.offset(FLAGS_OFFSET), flags.bits() as u8);
             ptr::write(ptr.offset(LABEL_LEN_OFFSET), label.len() as u8);
+            ptr::write(ptr.offset(LAYOUT_OFFSET) as _, layout);
             ptr::copy_nonoverlapping(label.as_ptr(), ptr.offset(LABEL_OFFSET), label.len());
 
             let mut offset = LABEL_OFFSET + label.len() as isize;
@@ -696,10 +704,12 @@ impl<V> Drop for Node<V> {
             let _ = self.take_value();
             let _ = self.take_child();
             let _ = self.take_sibling();
-            libc::free(self.ptr as *mut libc::c_void)
+            let layout = ptr::read::<Layout>(self.ptr.offset(LAYOUT_OFFSET) as _);
+            alloc::dealloc(self.ptr, layout);
         }
     }
 }
+
 impl<V: Clone> Clone for Node<V> {
     fn clone(&self) -> Self {
         let label = self.label();
