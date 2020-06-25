@@ -43,6 +43,7 @@ const MAX_LABEL_LEN: usize = 255;
 /// Note that this is a low level building block.
 /// Usually it is recommended to use more high level data structures (e.g., `PatriciaTree`).
 #[derive(Debug)]
+// #[repr(C, align(256))]
 pub struct Node<V> {
     // layout:
     //   - flags: u8
@@ -111,11 +112,12 @@ impl<V> Node<V> {
         sibling: Option<Self>,
     ) -> Self {
         if label.len() > MAX_LABEL_LEN {
+            println!("hit max label size");
             child = Some(Node::new(&label[MAX_LABEL_LEN..], value, child, None));
             label = &label[..MAX_LABEL_LEN];
             value = None;
         }
-
+        println!("v alignment {:?}", mem::align_of::<V>());
         let mut flags = Flags::empty();
         let mut block_size = LABEL_OFFSET as usize + label.len();
         if value.is_some() {
@@ -132,8 +134,11 @@ impl<V> Node<V> {
         }
 
         block_size += mem::size_of::<Layout>();
+        println!("{:?}", block_size);
+        println!("align {:?}", block_size + 256);
 
-        let layout = Layout::array::<u8>(block_size).expect("Failed to get layout");
+        let layout =
+            Layout::from_size_align(block_size, (block_size + 256).next_power_of_two()).unwrap();
         let ptr = unsafe { alloc::alloc(layout) as *mut u8 };
         assert_ne!(ptr, ptr::null_mut());
 
@@ -156,6 +161,7 @@ impl<V> Node<V> {
                 ptr::write(ptr.offset(offset) as _, sibling);
             }
         }
+        println!("made");
         Node {
             ptr,
             _value: PhantomData,
@@ -856,6 +862,7 @@ mod tests {
         let set = ["123", "123456", "1234_67", "123abc", "123def"]
             .iter()
             .collect::<PatriciaSet>();
+        println!("here");
 
         let lcp = |key| set.get_longest_common_prefix(key);
         assert_eq!(lcp(""), None);
