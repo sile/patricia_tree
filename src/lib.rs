@@ -25,8 +25,6 @@
 #![warn(missing_docs)]
 #![allow(clippy::cast_ptr_alignment, clippy::cast_ref_to_mut)]
 
-#[macro_use]
-extern crate bitflags;
 #[cfg(feature = "binary-format")]
 #[macro_use]
 extern crate bytecodec;
@@ -39,6 +37,7 @@ extern crate trackable;
 pub use map::PatriciaMap;
 pub use set::PatriciaSet;
 
+// pub mod map;
 pub mod map;
 pub mod node;
 pub mod set;

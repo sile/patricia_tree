@@ -15,26 +15,8 @@ macro_rules! assert_some {
     };
 }
 
-bitflags! {
-    pub (crate) struct Flags: u8 {
-        const VALUE_ALLOCATED = 0b0000_0001;
-        const VALUE_INITIALIZED = 0b0000_0010;
-
-        const CHILD_ALLOCATED = 0b0000_0100;
-        const CHILD_INITIALIZED = 0b0000_1000;
-
-        const SIBLING_ALLOCATED = 0b0001_0000;
-        const SIBLING_INITIALIZED = 0b0010_0000;
-    }
-}
-
 #[cfg(feature = "binary-format")]
 pub use crate::codec::{NodeDecoder, NodeEncoder};
-
-const FLAGS_OFFSET: isize = 0;
-const LABEL_LEN_OFFSET: isize = 1;
-const LAYOUT_OFFSET: isize = 2;
-const LABEL_OFFSET: isize = 4;
 
 const MAX_LABEL_LEN: usize = 255;
 
@@ -43,21 +25,19 @@ const MAX_LABEL_LEN: usize = 255;
 /// Note that this is a low level building block.
 /// Usually it is recommended to use more high level data structures (e.g., `PatriciaTree`).
 #[derive(Debug)]
-// #[repr(C, align(256))]
+#[repr(C)]
 pub struct Node<V> {
-    // layout:
-    //   - flags: u8
-    //   - label_len: u8
-    //   - layout: Layout
-    //   - label: [u8; label_len]
-    //   - value: Option<V>
-    //   - child: Option<Node<V>>
-    //   - sibling: Option<Node<V>>
-    ptr: *mut u8,
-
+    // label_len: u8,
+    value: Option<V>,
+    child: Option<*mut Node<V>>,
+    sibling: Option<*mut Node<V>>,
+    label: Vec<u8>,
     _value: PhantomData<V>,
 }
+
 unsafe impl<V> Send for Node<V> {}
+unsafe impl<V> Sync for Node<V> {}
+
 impl<V> Node<V> {
     /// Makes a new node which represents an empty tree.
     ///
@@ -112,266 +92,282 @@ impl<V> Node<V> {
         sibling: Option<Self>,
     ) -> Self {
         if label.len() > MAX_LABEL_LEN {
-            println!("hit max label size");
             child = Some(Node::new(&label[MAX_LABEL_LEN..], value, child, None));
             label = &label[..MAX_LABEL_LEN];
             value = None;
         }
-        println!("v alignment {:?}", mem::align_of::<V>());
-        let mut flags = Flags::empty();
-        let mut block_size = LABEL_OFFSET as usize + label.len();
-        if value.is_some() {
-            flags.insert(Flags::VALUE_ALLOCATED | Flags::VALUE_INITIALIZED);
-            block_size += mem::size_of::<V>();
-        }
-        if child.is_some() {
-            flags.insert(Flags::CHILD_ALLOCATED | Flags::CHILD_INITIALIZED);
-            block_size += mem::size_of::<Self>();
-        }
-        if sibling.is_some() {
-            flags.insert(Flags::SIBLING_ALLOCATED | Flags::SIBLING_INITIALIZED);
-            block_size += mem::size_of::<Self>();
-        }
 
-        block_size += mem::size_of::<Layout>();
-        println!("{:?}", block_size);
-        println!("align {:?}", block_size + 256);
-
-        let layout =
-            Layout::from_size_align(block_size, (block_size + 256).next_power_of_two()).unwrap();
-        let ptr = unsafe { alloc::alloc(layout) as *mut u8 };
-        assert_ne!(ptr, ptr::null_mut());
-
-        unsafe {
-            ptr::write(ptr.offset(FLAGS_OFFSET), flags.bits() as u8);
-            ptr::write(ptr.offset(LABEL_LEN_OFFSET), label.len() as u8);
-            ptr::write(ptr.offset(LAYOUT_OFFSET) as _, layout);
-            ptr::copy_nonoverlapping(label.as_ptr(), ptr.offset(LABEL_OFFSET), label.len());
-
-            let mut offset = LABEL_OFFSET + label.len() as isize;
-            if let Some(value) = value {
-                ptr::write(ptr.offset(offset) as _, value);
-                offset += mem::size_of::<V>() as isize;
-            }
-            if let Some(child) = child {
-                ptr::write(ptr.offset(offset) as _, child);
-                offset += mem::size_of::<Self>() as isize;
-            }
-            if let Some(sibling) = sibling {
-                ptr::write(ptr.offset(offset) as _, sibling);
-            }
-        }
-        println!("made");
+        let child = child.map(|c| Box::into_raw(Box::new(c)));
+        let sibling = sibling.map(|c| Box::into_raw(Box::new(c)));
         Node {
-            ptr,
+            // label_len: label.len() as u8,
+            value,
+            child,
+            sibling,
+            label: label.to_vec(),
             _value: PhantomData,
         }
     }
 
-    #[cfg(feature = "binary-format")]
-    pub(crate) fn new_for_decoding(flags: Flags, label_len: u8) -> Self {
-        let mut init_flags = Flags::empty();
-        let mut block_size = LABEL_OFFSET as usize + label_len as usize;
-        if flags.contains(Flags::VALUE_INITIALIZED) {
-            init_flags.insert(Flags::VALUE_ALLOCATED);
-            block_size += mem::size_of::<V>();
-        }
-        if flags.contains(Flags::CHILD_INITIALIZED) {
-            init_flags.insert(Flags::CHILD_ALLOCATED);
-            block_size += mem::size_of::<Self>();
-        }
-        if flags.contains(Flags::SIBLING_INITIALIZED) {
-            init_flags.insert(Flags::SIBLING_ALLOCATED);
-            block_size += mem::size_of::<Self>();
-        }
-        let ptr = unsafe { libc::malloc(block_size) } as *mut u8;
-        assert_ne!(ptr, ptr::null_mut());
-
-        unsafe {
-            ptr::write(ptr.offset(FLAGS_OFFSET), init_flags.bits());
-            ptr::write(ptr.offset(LABEL_LEN_OFFSET), label_len);
+    pub fn new_raw(
+        mut label: &[u8],
+        mut value: Option<V>,
+        mut child: Option<*mut Self>,
+        sibling: Option<*mut Self>,
+    ) -> Self {
+        if label.len() > MAX_LABEL_LEN {
+            child = Some(Box::into_raw(Box::new(Node::new_raw(
+                &label[MAX_LABEL_LEN..],
+                value,
+                child,
+                None,
+            ))));
+            label = &label[..MAX_LABEL_LEN];
+            value = None;
         }
         Node {
-            ptr,
+            // label_len: label.len() as u8,
+            value,
+            child,
+            sibling,
+            label: label.to_vec(),
             _value: PhantomData,
         }
     }
 
-    /// Returns the label of this node.
+    pub fn child(&self) -> Option<&Node<V>> {
+        self.child.map(|c| unsafe { &*c })
+    }
+
+    pub fn sibling(&self) -> Option<&Node<V>> {
+        self.sibling.map(|c| unsafe { &*c })
+    }
+
     pub fn label(&self) -> &[u8] {
-        unsafe {
-            let label_len = *self.ptr.offset(LABEL_LEN_OFFSET) as usize;
-            slice::from_raw_parts(self.ptr.offset(LABEL_OFFSET), label_len)
-        }
+        &self.label[..self.label.len()]
     }
-
-    #[cfg(feature = "binary-format")]
-    pub(crate) fn label_mut(&mut self) -> &mut [u8] {
-        unsafe {
-            let label_len = *self.ptr.offset(LABEL_LEN_OFFSET) as usize;
-            slice::from_raw_parts_mut(self.ptr.offset(LABEL_OFFSET), label_len)
-        }
+    pub fn label_mut(&mut self) -> &mut [u8] {
+        let len = self.label.len();
+        self.label[..len].as_mut()
     }
-
-    /// Returns the reference to the value of this node.
     pub fn value(&self) -> Option<&V> {
-        if let Some(offset) = self.value_offset() {
-            if self.flags().contains(Flags::VALUE_INITIALIZED) {
-                unsafe {
-                    let value = self.ptr.offset(offset) as *const V;
-                    return Some(&*value);
-                }
-            }
-        }
-        None
+        self.value.as_ref()
     }
-
-    /// Returns the mutable reference to the value of this node.
     pub fn value_mut(&mut self) -> Option<&mut V> {
-        if let Some(offset) = self.value_offset() {
-            if self.flags().contains(Flags::VALUE_INITIALIZED) {
-                unsafe {
-                    let value = self.ptr.offset(offset) as *mut V;
-                    return Some(&mut *value);
-                }
-            }
-        }
-        None
+        self.value.as_mut()
     }
-
-    /// Returns the reference to the child of this node.
-    pub fn child(&self) -> Option<&Self> {
-        if let Some(offset) = self.child_offset() {
-            if self.flags().contains(Flags::CHILD_INITIALIZED) {
-                unsafe {
-                    let child = self.ptr.offset(offset) as *const Self;
-                    return Some(&*child);
-                }
-            }
-        }
-        None
+    pub fn child_mut(&mut self) -> Option<&mut Node<V>> {
+        self.child.map(|c| unsafe { &mut *c })
     }
-
-    /// Returns the mutable reference to the child of this node.
-    pub fn child_mut(&mut self) -> Option<&mut Self> {
-        if let Some(offset) = self.child_offset() {
-            if self.flags().contains(Flags::CHILD_INITIALIZED) {
-                unsafe {
-                    let child = self.ptr.offset(offset) as *mut Self;
-                    return Some(&mut *child);
-                }
-            }
-        }
-        None
+    pub fn sibling_mut(&mut self) -> Option<&mut Node<V>> {
+        self.sibling.map(|c| unsafe { &mut *c })
     }
-
-    /// Returns the reference to the sibling of this node.
-    pub fn sibling(&self) -> Option<&Self> {
-        if let Some(offset) = self.sibling_offset() {
-            if self.flags().contains(Flags::SIBLING_INITIALIZED) {
-                unsafe {
-                    let sibling = self.ptr.offset(offset) as *const Self;
-                    return Some(&*sibling);
-                }
-            }
-        }
-        None
-    }
-
-    /// Returns the mutable reference to the sibling of this node.
-    pub fn sibling_mut(&mut self) -> Option<&mut Self> {
-        if let Some(offset) = self.sibling_offset() {
-            if self.flags().contains(Flags::SIBLING_INITIALIZED) {
-                unsafe {
-                    let sibling = self.ptr.offset(offset) as *mut Self;
-                    return Some(&mut *sibling);
-                }
-            }
-        }
-        None
-    }
-
-    /// Takes the value out of this node.
     pub fn take_value(&mut self) -> Option<V> {
-        if let Some(offset) = self.value_offset() {
-            if self.flags().contains(Flags::VALUE_INITIALIZED) {
-                self.set_flags(Flags::VALUE_INITIALIZED, false);
-                unsafe {
-                    let value = self.ptr.offset(offset) as *const V;
-                    return Some(mem::transmute_copy(&*value));
-                }
-            }
-        }
-        None
+        self.value.take()
     }
-
-    /// Takes the child out of this node.
     pub fn take_child(&mut self) -> Option<Self> {
-        if let Some(offset) = self.child_offset() {
-            if self.flags().contains(Flags::CHILD_INITIALIZED) {
-                self.set_flags(Flags::CHILD_INITIALIZED, false);
-                unsafe {
-                    let child = self.ptr.offset(offset) as *mut Self;
-                    return Some(mem::transmute_copy(&*child));
-                }
-            }
-        }
-        None
+        self.child.take().map(|c| unsafe { *Box::from_raw(c) })
     }
-
-    /// Takes the sibling out of this node.
     pub fn take_sibling(&mut self) -> Option<Self> {
-        if let Some(offset) = self.sibling_offset() {
-            if self.flags().contains(Flags::SIBLING_INITIALIZED) {
-                self.set_flags(Flags::SIBLING_INITIALIZED, false);
-                unsafe {
-                    let sibling = self.ptr.offset(offset) as *mut Self;
-                    return Some(mem::transmute_copy(&*sibling));
-                }
-            }
-        }
-        None
+        self.sibling.take().map(|c| unsafe { *Box::from_raw(c) })
     }
-
-    /// Sets the value of this node.
     pub fn set_value(&mut self, value: V) {
         self.take_value();
-        if let Some(offset) = self.value_offset() {
-            self.set_flags(Flags::VALUE_INITIALIZED, true);
-            unsafe { ptr::write(self.ptr.offset(offset) as _, value) };
-        } else {
-            let child = self.take_child();
-            let sibling = self.take_sibling();
-            let node = Node::new(self.label(), Some(value), child, sibling);
-            *self = node;
-        }
+        self.value = Some(value);
     }
-
-    /// Sets the child of this node.
     pub fn set_child(&mut self, child: Self) {
         self.take_child();
-        if let Some(offset) = self.child_offset() {
-            self.set_flags(Flags::CHILD_INITIALIZED, true);
-            unsafe { ptr::write(self.ptr.offset(offset) as _, child) };
+        self.child = Some(Box::into_raw(Box::new(child)));
+    }
+    pub fn set_sibling(&mut self, sibling: Self) {
+        self.take_sibling();
+        self.sibling = Some(Box::into_raw(Box::new(sibling)));
+    }
+
+    pub(crate) fn get(&self, key: &[u8]) -> Option<&V> {
+        let common_prefix_len = self.skip_common_prefix(key);
+        let next = &key[common_prefix_len..];
+        if common_prefix_len == self.label().len() {
+            if next.is_empty() {
+                self.value()
+            } else {
+                self.child().and_then(|child| child.get(next))
+            }
+        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+            self.sibling().and_then(|sibling| sibling.get(next))
         } else {
-            let value = self.take_value();
-            let sibling = self.take_sibling();
-            let node = Node::new(self.label(), value, Some(child), sibling);
-            *self = node;
+            None
         }
     }
 
-    /// Sets the sibling of this node.
-    pub fn set_sibling(&mut self, sibling: Self) {
-        self.take_sibling();
-        if let Some(offset) = self.sibling_offset() {
-            self.set_flags(Flags::SIBLING_INITIALIZED, true);
-            unsafe { ptr::write(self.ptr.offset(offset) as _, sibling) };
+    pub(crate) fn get_mut(&mut self, key: &[u8]) -> Option<&mut V> {
+        let common_prefix_len = self.skip_common_prefix(key);
+        let next = &key[common_prefix_len..];
+        if common_prefix_len == self.label().len() {
+            if next.is_empty() {
+                self.value_mut()
+            } else {
+                self.child_mut().and_then(|child| child.get_mut(next))
+            }
+        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+            self.sibling_mut().and_then(|sibling| sibling.get_mut(next))
         } else {
-            let value = self.take_value();
-            let child = self.take_child();
-            let node = Node::new(self.label(), value, child, Some(sibling));
+            None
+        }
+    }
+    pub(crate) fn get_longest_common_prefix(
+        &self,
+        key: &[u8],
+        offset: usize,
+    ) -> Option<(usize, &V)> {
+        let common_prefix_len = self.skip_common_prefix(key);
+        let next = &key[common_prefix_len..];
+        if common_prefix_len == self.label().len() {
+            let offset = offset + common_prefix_len;
+            if next.is_empty() {
+                self.value().map(|v| (offset, v))
+            } else {
+                self.child()
+                    .and_then(|child| child.get_longest_common_prefix(next, offset))
+                    .or_else(|| self.value().map(|v| (offset, v)))
+            }
+        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+            self.sibling()
+                .and_then(|sibling| sibling.get_longest_common_prefix(next, offset))
+        } else {
+            None
+        }
+    }
+    fn skip_common_prefix(&self, key: &[u8]) -> usize {
+        self.label()
+            .iter()
+            .zip(key.iter())
+            .take_while(|x| x.0 == x.1)
+            .count()
+    }
+
+    pub(crate) fn remove(&mut self, key: &[u8]) -> Option<V> {
+        let common_prefix_len = self.skip_common_prefix(key);
+        let next = &key[common_prefix_len..];
+        if common_prefix_len == self.label().len() {
+            if next.is_empty() {
+                self.take_value().map(|old| {
+                    self.try_merge_with_child();
+                    old
+                })
+            } else {
+                self.child_mut()
+                    .and_then(|child| child.remove(next))
+                    .map(|old| {
+                        self.try_reclaim_child();
+                        self.try_merge_with_child();
+                        old
+                    })
+            }
+        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+            self.sibling_mut()
+                .and_then(|sibling| sibling.remove(next))
+                .map(|old| {
+                    self.try_reclaim_sibling();
+                    old
+                })
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn insert(&mut self, key: &[u8], value: V) -> Option<V> {
+        if self.label().get(0) > key.get(0) {
+            let node = Node::new_raw(key, Some(value), None, Some(self as *mut _));
+            unsafe {
+                ptr::swap(self as *mut _, &node as *const _ as *mut _);
+            }
+            self.sibling = Some(Box::into_raw(Box::new(node)));
+            return None;
+        }
+
+        let common_prefix_len = self.skip_common_prefix(key);
+        let next = &key[common_prefix_len..];
+        let is_label_matched = common_prefix_len == self.label().len();
+        if next.is_empty() {
+            if is_label_matched {
+                let old = self.take_value();
+                self.set_value(value);
+                old
+            } else {
+                self.split_at(common_prefix_len);
+                self.set_value(value);
+                None
+            }
+        } else if is_label_matched {
+            if let Some(child) = self.child_mut() {
+                return child.insert(next, value);
+            }
+            let child = Node::new(next, Some(value), None, None);
+            self.set_child(child);
+            None
+        } else if common_prefix_len == 0 {
+            if let Some(sibling) = self.sibling_mut() {
+                return sibling.insert(next, value);
+            }
+            let sibling = Node::new(next, Some(value), None, None);
+            self.set_sibling(sibling);
+            None
+        } else {
+            self.split_at(common_prefix_len);
+            assert_some!(self.child_mut()).insert(next, value);
+            None
+        }
+    }
+    fn split_at(&mut self, position: usize) {
+        debug_assert!(position < self.label_len());
+        let value = self.take_value();
+        let child = self.take_child();
+        let sibling = self.take_sibling();
+
+        let child = Node::new(&self.label()[position..], value, child, None);
+        let parent = Node::new(&self.label()[..position], None, Some(child), sibling);
+        *self = parent;
+    }
+    fn label_len(&self) -> usize {
+        // self.label_len as usize
+        self.label.len()
+    }
+    pub(crate) fn try_merge_with_child(&mut self) {
+        if self.value().is_some() || self.child.is_none() {
+            return;
+        }
+
+        let child = assert_some!(self.child());
+        if child.sibling().is_none() && (self.label_len() + child.label_len()) <= MAX_LABEL_LEN {
+            let mut child = assert_some!(self.take_child());
+            let sibling = self.take_sibling();
+            let value = child.take_value();
+            let grandchild = child.take_child();
+
+            let mut label = Vec::with_capacity(self.label_len() + child.label_len());
+            label.extend(self.label());
+            label.extend(child.label());
+            let node = Self::new(&label, value, grandchild, sibling);
             *self = node;
+        }
+    }
+    fn try_reclaim_sibling(&mut self) {
+        let sibling = assert_some!(self.sibling());
+        if sibling.value().is_some() | sibling.child().is_some() {
+            return;
+        }
+        if let Some(sibling) = self.take_sibling().and_then(|mut n| n.take_sibling()) {
+            self.set_sibling(sibling);
+        }
+    }
+    fn try_reclaim_child(&mut self) {
+        let child = assert_some!(self.child());
+        if child.value().is_some() | child.child().is_some() {
+            return;
+        }
+        if let Some(child) = self.take_child().and_then(|mut n| n.take_sibling()) {
+            self.set_child(child);
         }
     }
 
@@ -418,60 +414,6 @@ impl<V> Node<V> {
         CommonPrefixesIter {
             key,
             stack: vec![(0, self)],
-        }
-    }
-
-    pub(crate) fn get(&self, key: &[u8]) -> Option<&V> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
-        if common_prefix_len == self.label().len() {
-            if next.is_empty() {
-                self.value()
-            } else {
-                self.child().and_then(|child| child.get(next))
-            }
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
-            self.sibling().and_then(|sibling| sibling.get(next))
-        } else {
-            None
-        }
-    }
-    pub(crate) fn get_mut(&mut self, key: &[u8]) -> Option<&mut V> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
-        if common_prefix_len == self.label().len() {
-            if next.is_empty() {
-                self.value_mut()
-            } else {
-                self.child_mut().and_then(|child| child.get_mut(next))
-            }
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
-            self.sibling_mut().and_then(|sibling| sibling.get_mut(next))
-        } else {
-            None
-        }
-    }
-    pub(crate) fn get_longest_common_prefix(
-        &self,
-        key: &[u8],
-        offset: usize,
-    ) -> Option<(usize, &V)> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
-        if common_prefix_len == self.label().len() {
-            let offset = offset + common_prefix_len;
-            if next.is_empty() {
-                self.value().map(|v| (offset, v))
-            } else {
-                self.child()
-                    .and_then(|child| child.get_longest_common_prefix(next, offset))
-                    .or_else(|| self.value().map(|v| (offset, v)))
-            }
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
-            self.sibling()
-                .and_then(|sibling| sibling.get_longest_common_prefix(next, offset))
-        } else {
-            None
         }
     }
 
@@ -523,196 +465,13 @@ impl<V> Node<V> {
             None
         }
     }
-    pub(crate) fn remove(&mut self, key: &[u8]) -> Option<V> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
-        if common_prefix_len == self.label().len() {
-            if next.is_empty() {
-                self.take_value().map(|old| {
-                    self.try_merge_with_child();
-                    old
-                })
-            } else {
-                self.child_mut()
-                    .and_then(|child| child.remove(next))
-                    .map(|old| {
-                        self.try_reclaim_child();
-                        self.try_merge_with_child();
-                        old
-                    })
-            }
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
-            self.sibling_mut()
-                .and_then(|sibling| sibling.remove(next))
-                .map(|old| {
-                    self.try_reclaim_sibling();
-                    old
-                })
-        } else {
-            None
-        }
-    }
-    pub(crate) fn insert(&mut self, key: &[u8], value: V) -> Option<V> {
-        if self.label().get(0) > key.get(0) {
-            let this = Node {
-                ptr: self.ptr,
-                _value: PhantomData,
-            };
-            let node = Node::new(key, Some(value), None, Some(this));
-            self.ptr = node.ptr;
-            mem::forget(node);
-            return None;
-        }
-
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
-        let is_label_matched = common_prefix_len == self.label().len();
-        if next.is_empty() {
-            if is_label_matched {
-                let old = self.take_value();
-                self.set_value(value);
-                old
-            } else {
-                self.split_at(common_prefix_len);
-                self.set_value(value);
-                None
-            }
-        } else if is_label_matched {
-            if let Some(child) = self.child_mut() {
-                return child.insert(next, value);
-            }
-            let child = Node::new(next, Some(value), None, None);
-            self.set_child(child);
-            None
-        } else if common_prefix_len == 0 {
-            if let Some(sibling) = self.sibling_mut() {
-                return sibling.insert(next, value);
-            }
-            let sibling = Node::new(next, Some(value), None, None);
-            self.set_sibling(sibling);
-            None
-        } else {
-            self.split_at(common_prefix_len);
-            assert_some!(self.child_mut()).insert(next, value);
-            None
-        }
-    }
-
-    fn skip_common_prefix(&self, key: &[u8]) -> usize {
-        self.label()
-            .iter()
-            .zip(key.iter())
-            .take_while(|x| x.0 == x.1)
-            .count()
-    }
-    pub(crate) fn flags(&self) -> Flags {
-        Flags::from_bits_truncate(unsafe { *self.ptr })
-    }
-    fn set_flags(&mut self, other: Flags, value: bool) {
-        let mut flags = self.flags();
-        flags.set(other, value);
-        unsafe { ptr::write(self.ptr, flags.bits() as u8) };
-    }
-    fn label_len(&self) -> usize {
-        unsafe { *self.ptr.offset(LABEL_LEN_OFFSET) as usize }
-    }
-    fn value_offset(&self) -> Option<isize> {
-        let flags = self.flags();
-        if flags.contains(Flags::VALUE_ALLOCATED) {
-            Some(LABEL_OFFSET + self.label_len() as isize)
-        } else {
-            None
-        }
-    }
-    fn child_offset(&self) -> Option<isize> {
-        let flags = self.flags();
-        if flags.contains(Flags::CHILD_ALLOCATED) {
-            let mut offset = LABEL_OFFSET + self.label_len() as isize;
-            if flags.contains(Flags::VALUE_ALLOCATED) {
-                offset += mem::size_of::<V>() as isize;
-            }
-            Some(offset)
-        } else {
-            None
-        }
-    }
-    fn sibling_offset(&self) -> Option<isize> {
-        let flags = self.flags();
-        if flags.contains(Flags::SIBLING_ALLOCATED) {
-            let mut offset = LABEL_OFFSET + self.label_len() as isize;
-            if flags.contains(Flags::VALUE_ALLOCATED) {
-                offset += mem::size_of::<V>() as isize;
-            }
-            if flags.contains(Flags::CHILD_ALLOCATED) {
-                offset += mem::size_of::<usize>() as isize;
-            }
-            Some(offset)
-        } else {
-            None
-        }
-    }
-    fn split_at(&mut self, position: usize) {
-        debug_assert!(position < self.label_len());
-        let value = self.take_value();
-        let child = self.take_child();
-        let sibling = self.take_sibling();
-
-        let child = Node::new(&self.label()[position..], value, child, None);
-        let parent = Node::new(&self.label()[..position], None, Some(child), sibling);
-        *self = parent;
-    }
-    fn try_reclaim_sibling(&mut self) {
-        let flags = assert_some!(self.sibling()).flags();
-        if flags.intersects(Flags::VALUE_INITIALIZED | Flags::CHILD_INITIALIZED) {
-            return;
-        }
-        if let Some(sibling) = self.take_sibling().and_then(|mut n| n.take_sibling()) {
-            self.set_sibling(sibling);
-        }
-    }
-    fn try_reclaim_child(&mut self) {
-        let flags = assert_some!(self.child()).flags();
-        if flags.intersects(Flags::VALUE_INITIALIZED | Flags::CHILD_INITIALIZED) {
-            return;
-        }
-        if let Some(child) = self.take_child().and_then(|mut n| n.take_sibling()) {
-            self.set_child(child);
-        }
-    }
-    pub(crate) fn try_merge_with_child(&mut self) {
-        if self.flags().contains(Flags::VALUE_INITIALIZED)
-            || !self.flags().contains(Flags::CHILD_INITIALIZED)
-        {
-            return;
-        }
-
-        let flags = assert_some!(self.child()).flags();
-        if !flags.contains(Flags::SIBLING_INITIALIZED)
-            && (self.label_len() + assert_some!(self.child()).label_len()) <= MAX_LABEL_LEN
-        {
-            let mut child = assert_some!(self.take_child());
-            let sibling = self.take_sibling();
-            let value = child.take_value();
-            let grandchild = child.take_child();
-
-            let mut label = Vec::with_capacity(self.label_len() + child.label_len());
-            label.extend(self.label());
-            label.extend(child.label());
-            let node = Self::new(&label, value, grandchild, sibling);
-            *self = node;
-        }
-    }
 }
 
 impl<V> Drop for Node<V> {
     fn drop(&mut self) {
-        unsafe {
-            let _ = self.take_value();
-            let _ = self.take_child();
-            let _ = self.take_sibling();
-            let layout = ptr::read::<Layout>(self.ptr.offset(LAYOUT_OFFSET) as _);
-            alloc::dealloc(self.ptr, layout);
-        }
+        let _ = self.take_value();
+        let _ = self.take_child();
+        let _ = self.take_sibling();
     }
 }
 
@@ -838,6 +597,83 @@ mod tests {
     }
 
     #[test]
+    fn split_at() {
+        let mut node = Node::new(&[b'a'; 100][..], Some(10), None, None);
+        assert!(node.child().is_none());
+        assert_eq!(node.value(), Some(&10));
+        node.split_at(50);
+        let child = node.child().unwrap();
+        assert_eq!(
+            child.label(),
+            &(0..50).map(|_| b'a').collect::<Vec<_>>()[..]
+        );
+        assert_eq!(child.value(), Some(&10));
+    }
+
+    #[test]
+    fn test() {
+        let node0 = Node::new("foo".as_ref(), Some(3), None, None);
+        assert_eq!(node0.label(), b"foo");
+        assert_eq!(node0.value(), Some(&3));
+        assert_eq!(node0.child().map(|n| n.label()), None);
+        assert_eq!(node0.sibling().map(|n| n.label()), None);
+
+        let node1 = Node::new("bar".as_ref(), None, None, Some(node0));
+        assert_eq!(node1.label(), b"bar");
+        assert_eq!(node1.value(), None);
+        assert_eq!(node1.child().map(|n| n.label()), None);
+        assert_eq!(node1.sibling().map(|n| n.label()), Some(&b"foo"[..]));
+
+        // If the length of a label name is longer than 255, it will be splitted to two nodes.
+        let node2 = Node::new([b'a'; 256].as_ref(), Some(4), Some(node1), None);
+        assert_eq!(node2.label(), [b'a'; 255].as_ref());
+        assert_eq!(node2.value(), None);
+        assert_eq!(node2.child().map(|n| n.label()), Some(&b"a"[..]));
+        assert_eq!(node2.sibling().map(|n| n.label()), None);
+
+        assert_eq!(node2.child().unwrap().value(), Some(&4));
+        assert_eq!(node2.child().unwrap().child().unwrap().label(), b"bar");
+    }
+
+    #[test]
+    fn insert_node() {
+        let mut node0 = Node::new("foo".as_ref(), Some(3), None, None);
+        node0.insert("fooo".as_ref(), 4);
+        node0.insert("x".as_ref(), 5);
+        assert_eq!(node0.value(), Some(&3));
+        assert_eq!(node0.label(), &b"foo"[..]);
+        assert_eq!(node0.child().unwrap().value(), Some(&4));
+        assert_eq!(node0.child().unwrap().label(), &b"o"[..]);
+    }
+    #[test]
+    fn insert_node_sibling() {
+        let mut node0 = Node::new("foo".as_ref(), Some(3), None, None);
+        node0.insert("fooo".as_ref(), 4);
+        node0.insert("a".as_ref(), 5); // becomes root node
+
+        assert_eq!(node0.value(), Some(&5));
+        assert_eq!(node0.label(), &b"a"[..]);
+        assert_eq!(node0.sibling().unwrap().value(), Some(&3));
+        assert_eq!(node0.sibling().unwrap().label(), &b"foo"[..]);
+    }
+
+    #[test]
+    fn get_longest_common_prefix_works() {
+        let set = ["123", "123456", "1234_67", "123abc", "123def"]
+            .iter()
+            .collect::<PatriciaSet>();
+
+        let lcp = |key| set.get_longest_common_prefix(key);
+        assert_eq!(lcp(""), None);
+        assert_eq!(lcp("12"), None);
+        assert_eq!(lcp("123"), Some("123".as_bytes()));
+        assert_eq!(lcp("1234"), Some("123".as_bytes()));
+        assert_eq!(lcp("123456"), Some("123456".as_bytes()));
+        assert_eq!(lcp("1234_6"), Some("123".as_bytes()));
+        assert_eq!(lcp("123456789"), Some("123456".as_bytes()));
+    }
+
+    #[test]
     fn reclaim_works() {
         let mut set = ["123", "123456", "123abc", "123def"]
             .iter()
@@ -855,23 +691,6 @@ mod tests {
 
         set.remove("123");
         assert_eq!(set_to_labels(&set), [(0, "123abc")]);
-    }
-
-    #[test]
-    fn get_longest_common_prefix_works() {
-        let set = ["123", "123456", "1234_67", "123abc", "123def"]
-            .iter()
-            .collect::<PatriciaSet>();
-        println!("here");
-
-        let lcp = |key| set.get_longest_common_prefix(key);
-        assert_eq!(lcp(""), None);
-        assert_eq!(lcp("12"), None);
-        assert_eq!(lcp("123"), Some("123".as_bytes()));
-        assert_eq!(lcp("1234"), Some("123".as_bytes()));
-        assert_eq!(lcp("123456"), Some("123456".as_bytes()));
-        assert_eq!(lcp("1234_6"), Some("123".as_bytes()));
-        assert_eq!(lcp("123456789"), Some("123456".as_bytes()));
     }
 
     fn set_to_labels(set: &PatriciaSet) -> Vec<(usize, &str)> {

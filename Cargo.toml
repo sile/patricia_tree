@@ -19,7 +19,6 @@ codecov = { repository = "sile/patricia_tree" }
 binary-format = ["bytecodec", "trackable"]
 
 [dependencies]
-bitflags = "1"
 bytecodec = { version = "0.4", optional = true }
 trackable = { version = "0.2", optional = true }
 
@@ -40,6 +39,3 @@ name = "encode"
 path = "examples/encode.rs"
 required-features = ["binary-format"]
 
-[[example]]
-name = "insert_lines"
-path = "examples/insert_lines.rs"
