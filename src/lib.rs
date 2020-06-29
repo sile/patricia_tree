@@ -37,7 +37,6 @@ extern crate trackable;
 pub use map::PatriciaMap;
 pub use set::PatriciaSet;
 
-// pub mod map;
 pub mod map;
 pub mod node;
 pub mod set;
