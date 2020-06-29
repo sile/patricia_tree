@@ -108,7 +108,7 @@ impl<V> Node<V> {
         }
     }
 
-    pub fn new_raw(
+    fn new_raw(
         mut label: &[u8],
         mut value: Option<V>,
         mut child: Option<*mut Self>,
