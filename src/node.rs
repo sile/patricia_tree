@@ -27,7 +27,6 @@ const MAX_LABEL_LEN: usize = 255;
 #[derive(Debug)]
 #[repr(C)]
 pub struct Node<V> {
-    // label_len: u8,
     value: Option<V>,
     child: Option<*mut Node<V>>,
     sibling: Option<*mut Node<V>>,
@@ -100,7 +99,6 @@ impl<V> Node<V> {
         let child = child.map(|c| Box::into_raw(Box::new(c)));
         let sibling = sibling.map(|c| Box::into_raw(Box::new(c)));
         Node {
-            // label_len: label.len() as u8,
             value,
             child,
             sibling,
@@ -126,7 +124,6 @@ impl<V> Node<V> {
             value = None;
         }
         Node {
-            // label_len: label.len() as u8,
             value,
             child,
             sibling,
@@ -146,39 +143,50 @@ impl<V> Node<V> {
     pub fn label(&self) -> &[u8] {
         &self.label[..self.label.len()]
     }
+
     pub fn label_mut(&mut self) -> &mut [u8] {
         let len = self.label.len();
         self.label[..len].as_mut()
     }
+
     pub fn value(&self) -> Option<&V> {
         self.value.as_ref()
     }
+
     pub fn value_mut(&mut self) -> Option<&mut V> {
         self.value.as_mut()
     }
+
     pub fn child_mut(&mut self) -> Option<&mut Node<V>> {
         self.child.map(|c| unsafe { &mut *c })
     }
+
     pub fn sibling_mut(&mut self) -> Option<&mut Node<V>> {
         self.sibling.map(|c| unsafe { &mut *c })
     }
+
     pub fn take_value(&mut self) -> Option<V> {
         self.value.take()
     }
+
     pub fn take_child(&mut self) -> Option<Self> {
         self.child.take().map(|c| unsafe { *Box::from_raw(c) })
     }
+
     pub fn take_sibling(&mut self) -> Option<Self> {
         self.sibling.take().map(|c| unsafe { *Box::from_raw(c) })
     }
+
     pub fn set_value(&mut self, value: V) {
         self.take_value();
         self.value = Some(value);
     }
+
     pub fn set_child(&mut self, child: Self) {
         self.take_child();
         self.child = Some(Box::into_raw(Box::new(child)));
     }
+
     pub fn set_sibling(&mut self, sibling: Self) {
         self.take_sibling();
         self.sibling = Some(Box::into_raw(Box::new(sibling)));
@@ -215,6 +223,7 @@ impl<V> Node<V> {
             None
         }
     }
+
     pub(crate) fn get_longest_common_prefix(
         &self,
         key: &[u8],
@@ -238,6 +247,7 @@ impl<V> Node<V> {
             None
         }
     }
+
     fn skip_common_prefix(&self, key: &[u8]) -> usize {
         self.label()
             .iter()
@@ -278,10 +288,8 @@ impl<V> Node<V> {
 
     pub(crate) fn insert(&mut self, key: &[u8], value: V) -> Option<V> {
         if self.label().get(0) > key.get(0) {
-            let node = Node::new_raw(key, Some(value), None, Some(self as *mut _));
-            unsafe {
-                ptr::swap(self as *mut _, &node as *const _ as *mut _);
-            }
+            let mut node = Node::new_raw(key, Some(value), None, Some(self as *mut _));
+            mem::swap(self, &mut node);
             self.sibling = Some(Box::into_raw(Box::new(node)));
             return None;
         }
@@ -484,6 +492,7 @@ impl<V: Clone> Clone for Node<V> {
         Node::new(label, value, child, sibling)
     }
 }
+
 impl<V> IntoIterator for Node<V> {
     type Item = (usize, Node<V>);
     type IntoIter = IntoIter<V>;
