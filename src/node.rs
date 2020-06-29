@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
 use std::slice;
+use smallvec::SmallVec;
 
 macro_rules! assert_some {
     ($expr:expr) => {
@@ -30,7 +31,7 @@ pub struct Node<V> {
     value: Option<V>,
     child: Option<*mut Node<V>>,
     sibling: Option<*mut Node<V>>,
-    label: Vec<u8>,
+    label: SmallVec<[u8; 10]>,
     _value: PhantomData<V>,
 }
 
@@ -102,7 +103,7 @@ impl<V> Node<V> {
             value,
             child,
             sibling,
-            label: label.to_vec(),
+            label: SmallVec::from_slice(label),
             _value: PhantomData,
         }
     }
@@ -127,7 +128,7 @@ impl<V> Node<V> {
             value,
             child,
             sibling,
-            label: label.to_vec(),
+            label: SmallVec::from_slice(label),
             _value: PhantomData,
         }
     }
