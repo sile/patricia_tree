@@ -478,7 +478,6 @@ impl<V> Node<V> {
 
 impl<V> Drop for Node<V> {
     fn drop(&mut self) {
-        let _ = self.take_value();
         let _ = self.take_child();
         let _ = self.take_sibling();
     }
