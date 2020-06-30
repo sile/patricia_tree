@@ -1,7 +1,7 @@
 //! A node which represents a subtree of a patricia tree.
+use smallvec::SmallVec;
 use std::marker::PhantomData;
 use std::mem;
-use smallvec::SmallVec;
 
 macro_rules! assert_some {
     ($expr:expr) => {
@@ -197,10 +197,10 @@ impl<V> Node<V> {
             if next.is_empty() {
                 self.value()
             } else {
-                self.child().and_then(|child| child.get(next))
+                self.child()?.get(next)
             }
         } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
-            self.sibling().and_then(|sibling| sibling.get(next))
+            self.sibling()?.get(next)
         } else {
             None
         }
@@ -213,10 +213,10 @@ impl<V> Node<V> {
             if next.is_empty() {
                 self.value_mut()
             } else {
-                self.child_mut().and_then(|child| child.get_mut(next))
+                self.child_mut()?.get_mut(next)
             }
         } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
-            self.sibling_mut().and_then(|sibling| sibling.get_mut(next))
+            self.sibling_mut()?.get_mut(next)
         } else {
             None
         }
@@ -239,8 +239,7 @@ impl<V> Node<V> {
                     .or_else(|| self.value().map(|v| (offset, v)))
             }
         } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
-            self.sibling()
-                .and_then(|sibling| sibling.get_longest_common_prefix(next, offset))
+            self.sibling()?.get_longest_common_prefix(next, offset)
         } else {
             None
         }
@@ -430,11 +429,9 @@ impl<V> Node<V> {
             Some((common_prefix_len, self))
         } else if common_prefix_len == self.label().len() {
             let offset = offset + common_prefix_len;
-            self.child()
-                .and_then(|child| child.get_prefix_node(next, offset))
+            self.child()?.get_prefix_node(next, offset)
         } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
-            self.sibling()
-                .and_then(|sibling| sibling.get_prefix_node(next, offset))
+            self.sibling()?.get_prefix_node(next, offset)
         } else {
             None
         }
