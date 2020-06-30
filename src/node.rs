@@ -1,9 +1,6 @@
 //! A node which represents a subtree of a patricia tree.
-use std::alloc::{self, Layout};
 use std::marker::PhantomData;
 use std::mem;
-use std::ptr;
-use std::slice;
 use smallvec::SmallVec;
 
 macro_rules! assert_some {
@@ -142,7 +139,7 @@ impl<V> Node<V> {
     }
 
     pub fn label(&self) -> &[u8] {
-        &self.label[..self.label.len()]
+        &self.label
     }
 
     pub fn label_mut(&mut self) -> &mut [u8] {
