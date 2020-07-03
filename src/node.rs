@@ -23,7 +23,6 @@ const MAX_LABEL_LEN: usize = 255;
 /// Note that this is a low level building block.
 /// Usually it is recommended to use more high level data structures (e.g., `PatriciaTree`).
 #[derive(Debug)]
-#[repr(C)]
 pub struct Node<V> {
     value: Option<V>,
     child: Option<*mut Node<V>>,
