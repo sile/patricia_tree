@@ -133,7 +133,8 @@ impl<V> Node<V> {
 
         block_size += mem::size_of::<Layout>();
 
-        let layout = Layout::array::<u8>(block_size).expect("Failed to get layout");
+        let layout = Layout::from_size_align(block_size, mem::align_of::<*mut Node<V>>())
+            .expect("Failed to get layout");
         let ptr = unsafe { alloc::alloc(layout) as *mut u8 };
         assert_ne!(ptr, ptr::null_mut());
 
