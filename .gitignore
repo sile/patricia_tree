@@ -1,3 +1,6 @@
 /target/
 **/*.rs.bk
 Cargo.lock
+
+enwiki-latest-all-titles-in-ns0
+googlebooks-eng-all-5gram-20120701-0
