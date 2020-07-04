@@ -2,6 +2,7 @@
 use smallvec::SmallVec;
 use std::marker::PhantomData;
 use std::mem;
+use std::ptr::NonNull;
 
 macro_rules! assert_some {
     ($expr:expr) => {
@@ -25,8 +26,8 @@ const MAX_LABEL_LEN: usize = 255;
 #[derive(Debug)]
 pub struct Node<V> {
     value: Option<V>,
-    child: Option<*mut Node<V>>,
-    sibling: Option<*mut Node<V>>,
+    child: Option<NonNull<Node<V>>>,
+    sibling: Option<NonNull<Node<V>>>,
     label: SmallVec<[u8; 10]>,
     _value: PhantomData<V>,
 }
@@ -93,8 +94,8 @@ impl<V> Node<V> {
             value = None;
         }
 
-        let child = child.map(|c| Box::into_raw(Box::new(c)));
-        let sibling = sibling.map(|c| Box::into_raw(Box::new(c)));
+        let child = child.map(|c| Box::leak(Box::new(c)).into());
+        let sibling = sibling.map(|c| Box::leak(Box::new(c)).into());
         Node {
             value,
             child,
@@ -122,19 +123,19 @@ impl<V> Node<V> {
         }
         Node {
             value,
-            child,
-            sibling,
+            child: child.and_then(|c| NonNull::new(c)),
+            sibling: sibling.and_then(|c| NonNull::new(c)),
             label: SmallVec::from_slice(label),
             _value: PhantomData,
         }
     }
 
     pub fn child(&self) -> Option<&Node<V>> {
-        self.child.map(|c| unsafe { &*c })
+        self.child.as_ref().map(|c| unsafe { c.as_ref() })
     }
 
     pub fn sibling(&self) -> Option<&Node<V>> {
-        self.sibling.map(|c| unsafe { &*c })
+        self.sibling.as_ref().map(|c| unsafe { c.as_ref() })
     }
 
     pub fn label(&self) -> &[u8] {
@@ -155,11 +156,11 @@ impl<V> Node<V> {
     }
 
     pub fn child_mut(&mut self) -> Option<&mut Node<V>> {
-        self.child.map(|c| unsafe { &mut *c })
+        self.child.as_mut().map(|c| unsafe { c.as_mut() })
     }
 
     pub fn sibling_mut(&mut self) -> Option<&mut Node<V>> {
-        self.sibling.map(|c| unsafe { &mut *c })
+        self.sibling.as_mut().map(|c| unsafe { c.as_mut() })
     }
 
     pub fn take_value(&mut self) -> Option<V> {
@@ -167,11 +168,15 @@ impl<V> Node<V> {
     }
 
     pub fn take_child(&mut self) -> Option<Self> {
-        self.child.take().map(|c| unsafe { *Box::from_raw(c) })
+        self.child
+            .take()
+            .map(|c| unsafe { *Box::from_raw(c.as_ptr()) })
     }
 
     pub fn take_sibling(&mut self) -> Option<Self> {
-        self.sibling.take().map(|c| unsafe { *Box::from_raw(c) })
+        self.sibling
+            .take()
+            .map(|c| unsafe { *Box::from_raw(c.as_ptr()) })
     }
 
     pub fn set_value(&mut self, value: V) {
@@ -181,12 +186,12 @@ impl<V> Node<V> {
 
     pub fn set_child(&mut self, child: Self) {
         self.take_child();
-        self.child = Some(Box::into_raw(Box::new(child)));
+        self.child = Some(Box::leak(Box::new(child)).into());
     }
 
     pub fn set_sibling(&mut self, sibling: Self) {
         self.take_sibling();
-        self.sibling = Some(Box::into_raw(Box::new(sibling)));
+        self.sibling = Some(Box::leak(Box::new(sibling)).into());
     }
 
     pub(crate) fn get(&self, key: &[u8]) -> Option<&V> {
@@ -286,7 +291,7 @@ impl<V> Node<V> {
         if self.label().get(0) > key.get(0) {
             let mut node = Node::new_raw(key, Some(value), None, Some(self as *mut _));
             mem::swap(self, &mut node);
-            self.sibling = Some(Box::into_raw(Box::new(node)));
+            self.sibling = Some(Box::leak(Box::new(node)).into());
             return None;
         }
 
@@ -334,7 +339,6 @@ impl<V> Node<V> {
         *self = parent;
     }
     fn label_len(&self) -> usize {
-        // self.label_len as usize
         self.label.len()
     }
     pub(crate) fn try_merge_with_child(&mut self) {
