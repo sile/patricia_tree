@@ -43,6 +43,7 @@ const MAX_LABEL_LEN: usize = 255;
 /// Note that this is a low level building block.
 /// Usually it is recommended to use more high level data structures (e.g., `PatriciaTree`).
 #[derive(Debug)]
+#[repr(C, align(8))]
 pub struct Node<V> {
     // layout:
     //   - flags: u8
