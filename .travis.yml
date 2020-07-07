@@ -10,10 +10,10 @@ matrix:
 
 env:
   global:
-  - RUSTFLAGS="-C link-dead-code"
+    - RUSTFLAGS="-C link-dead-code"
 
 script:
-  - cargo test --verbose --all-features
+  - cargo test --verbose
 
 addons:
   apt:
