@@ -30,7 +30,6 @@ extern crate bitflags;
 #[cfg(feature = "binary-format")]
 #[macro_use]
 extern crate bytecodec;
-extern crate libc;
 #[cfg(test)]
 extern crate rand;
 #[cfg(feature = "binary-format")]
