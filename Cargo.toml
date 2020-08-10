@@ -12,8 +12,7 @@ license = "MIT"
 edition = "2018"
 
 [badges]
-travis-ci = { repository = "sile/patricia_tree" }
-codecov = { repository = "sile/patricia_tree" }
+coveralls = {repository = "sile/libflate"}
 
 [features]
 binary-format = ["bytecodec", "trackable"]
