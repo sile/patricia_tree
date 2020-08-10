@@ -1,5 +1,5 @@
 //! A node which represents a subtree of a patricia tree.
-use std::alloc::{alloc, dealloc, handle_alloc_error, Layout, LayoutErr};
+use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
@@ -115,23 +115,23 @@ impl<V> Node<V> {
         }
 
         let mut flags = Flags::empty();
-        let mut layout = Layout::from_size_align(LABEL_OFFSET as usize + label.len(), 1).unwrap();
+        let mut layout = Self::initial_layout(label.len());
         let value = value.map(|value| {
             flags.insert(Flags::VALUE_ALLOCATED | Flags::VALUE_INITIALIZED);
-            let (layout_, offset) = layout.extend(Layout::new::<V>()).unwrap();
-            layout = layout_;
+            let (new_layout, offset) = layout.extend(Layout::new::<V>()).expect("unreachable");
+            layout = new_layout;
             (value, offset)
         });
         let child = child.map(|child| {
             flags.insert(Flags::CHILD_ALLOCATED | Flags::CHILD_INITIALIZED);
-            let (layout_, offset) = layout.extend(Layout::new::<Self>()).unwrap();
-            layout = layout_;
+            let (new_layout, offset) = layout.extend(Layout::new::<Self>()).expect("unreachable");
+            layout = new_layout;
             (child, offset)
         });
         let sibling = sibling.map(|sibling| {
             flags.insert(Flags::SIBLING_ALLOCATED | Flags::SIBLING_INITIALIZED);
-            let (layout_, offset) = layout.extend(Layout::new::<Self>()).unwrap();
-            layout = layout_;
+            let (new_layout, offset) = layout.extend(Layout::new::<Self>()).expect("unreachable");
+            layout = new_layout;
             (sibling, offset)
         });
 
@@ -164,19 +164,18 @@ impl<V> Node<V> {
     #[cfg(feature = "binary-format")]
     pub(crate) fn new_for_decoding(flags: Flags, label_len: u8) -> Self {
         let mut init_flags = Flags::empty();
-        let mut layout =
-            Layout::from_size_align(LABEL_OFFSET as usize + label_len as usize, 1).unwrap();
+        let mut layout = Self::initial_layout(label_len as usize);
         if flags.contains(Flags::VALUE_INITIALIZED) {
             init_flags.insert(Flags::VALUE_ALLOCATED);
-            layout = layout.extend(Layout::new::<V>()).unwrap().0;
+            layout = layout.extend(Layout::new::<V>()).expect("unreachable").0;
         }
         if flags.contains(Flags::CHILD_INITIALIZED) {
             init_flags.insert(Flags::CHILD_ALLOCATED);
-            layout = layout.extend(Layout::new::<Self>()).unwrap().0;
+            layout = layout.extend(Layout::new::<Self>()).expect("unreachable").0;
         }
         if flags.contains(Flags::SIBLING_INITIALIZED) {
             init_flags.insert(Flags::SIBLING_ALLOCATED);
-            layout = layout.extend(Layout::new::<Self>()).unwrap().0;
+            layout = layout.extend(Layout::new::<Self>()).expect("unreachable").0;
         }
 
         let ptr = unsafe { alloc(layout.pad_to_align()) };
@@ -614,9 +613,8 @@ impl<V> Node<V> {
     fn value_offset(&self) -> Option<isize> {
         let flags = self.flags();
         if flags.contains(Flags::VALUE_ALLOCATED) {
-            let layout =
-                Layout::from_size_align(LABEL_OFFSET as usize + self.label_len(), 1).unwrap();
-            let offset = layout.extend(Layout::new::<V>()).unwrap().1;
+            let layout = Self::initial_layout(self.label_len());
+            let offset = layout.extend(Layout::new::<V>()).expect("unreachable").1;
             Some(offset as isize)
         } else {
             None
@@ -625,13 +623,11 @@ impl<V> Node<V> {
     fn child_offset(&self) -> Option<isize> {
         let flags = self.flags();
         if flags.contains(Flags::CHILD_ALLOCATED) {
-            let mut layout =
-                Layout::from_size_align(LABEL_OFFSET as usize + self.label_len(), 1).unwrap();
-
+            let mut layout = Self::initial_layout(self.label_len());
             if flags.contains(Flags::VALUE_ALLOCATED) {
-                layout = layout.extend(Layout::new::<V>()).unwrap().0;
+                layout = layout.extend(Layout::new::<V>()).expect("unreachable").0;
             }
-            let offset = layout.extend(Layout::new::<Self>()).unwrap().1;
+            let offset = layout.extend(Layout::new::<Self>()).expect("unreachable").1;
             Some(offset as isize)
         } else {
             None
@@ -640,16 +636,14 @@ impl<V> Node<V> {
     fn sibling_offset(&self) -> Option<isize> {
         let flags = self.flags();
         if flags.contains(Flags::SIBLING_ALLOCATED) {
-            let mut layout =
-                Layout::from_size_align(LABEL_OFFSET as usize + self.label_len(), 1).unwrap();
-
+            let mut layout = Self::initial_layout(self.label_len());
             if flags.contains(Flags::VALUE_ALLOCATED) {
-                layout = layout.extend(Layout::new::<V>()).unwrap().0;
+                layout = layout.extend(Layout::new::<V>()).expect("unreachable").0;
             }
             if flags.contains(Flags::CHILD_ALLOCATED) {
-                layout = layout.extend(Layout::new::<Self>()).unwrap().0;
+                layout = layout.extend(Layout::new::<Self>()).expect("unreachable").0;
             }
-            let offset = layout.extend(Layout::new::<Self>()).unwrap().1;
+            let offset = layout.extend(Layout::new::<Self>()).expect("unreachable").1;
             Some(offset as isize)
         } else {
             None
@@ -706,34 +700,31 @@ impl<V> Node<V> {
             *self = node;
         }
     }
+
+    #[inline]
+    fn initial_layout(label_len: usize) -> Layout {
+        Layout::from_size_align(LABEL_OFFSET as usize + label_len, 1).expect("unreachable")
+    }
 }
 
 impl<V> Drop for Node<V> {
     fn drop(&mut self) {
-        unsafe {
-            let _ = self.take_value();
-            let _ = self.take_child();
-            let _ = self.take_sibling();
+        let _ = self.take_value();
+        let _ = self.take_child();
+        let _ = self.take_sibling();
 
-            let mut layout =
-                Layout::from_size_align_unchecked(LABEL_OFFSET as usize + self.label_len(), 1);
-
-            (|| -> Result<_, LayoutErr> {
-                if self.flags().contains(Flags::VALUE_ALLOCATED) {
-                    layout = layout.extend(Layout::new::<V>())?.0;
-                }
-                if self.flags().contains(Flags::CHILD_ALLOCATED) {
-                    layout = layout.extend(Layout::new::<Self>())?.0;
-                }
-                if self.flags().contains(Flags::SIBLING_ALLOCATED) {
-                    layout = layout.extend(Layout::new::<Self>())?.0;
-                }
-                Ok(())
-            })()
-            .unwrap();
-
-            dealloc(self.ptr, layout.pad_to_align())
+        let mut layout = Self::initial_layout(self.label_len());
+        if self.flags().contains(Flags::VALUE_ALLOCATED) {
+            layout = layout.extend(Layout::new::<V>()).expect("unreachable").0;
         }
+        if self.flags().contains(Flags::CHILD_ALLOCATED) {
+            layout = layout.extend(Layout::new::<Self>()).expect("unreachable").0;
+        }
+        if self.flags().contains(Flags::SIBLING_ALLOCATED) {
+            layout = layout.extend(Layout::new::<Self>()).expect("unreachable").0;
+        }
+
+        unsafe { dealloc(self.ptr, layout.pad_to_align()) }
     }
 }
 impl<V: Clone> Clone for Node<V> {
