@@ -1,4 +1,5 @@
 //! A node which represents a subtree of a patricia tree.
+use std::alloc::{alloc, dealloc, handle_alloc_error, Layout, LayoutErr};
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
@@ -114,63 +115,71 @@ impl<V> Node<V> {
         }
 
         let mut flags = Flags::empty();
-        let mut block_size = LABEL_OFFSET as usize + label.len();
-        if value.is_some() {
+        let mut layout = Layout::from_size_align(LABEL_OFFSET as usize + label.len(), 1).unwrap();
+        let value = value.map(|value| {
             flags.insert(Flags::VALUE_ALLOCATED | Flags::VALUE_INITIALIZED);
-            block_size += mem::size_of::<V>();
-        }
-        if child.is_some() {
+            let (layout_, offset) = layout.extend(Layout::new::<V>()).unwrap();
+            layout = layout_;
+            (value, offset)
+        });
+        let child = child.map(|child| {
             flags.insert(Flags::CHILD_ALLOCATED | Flags::CHILD_INITIALIZED);
-            block_size += mem::size_of::<Self>();
-        }
-        if sibling.is_some() {
+            let (layout_, offset) = layout.extend(Layout::new::<Self>()).unwrap();
+            layout = layout_;
+            (child, offset)
+        });
+        let sibling = sibling.map(|sibling| {
             flags.insert(Flags::SIBLING_ALLOCATED | Flags::SIBLING_INITIALIZED);
-            block_size += mem::size_of::<Self>();
-        }
-        let ptr = unsafe { libc::malloc(block_size) } as *mut u8;
-        assert_ne!(ptr, ptr::null_mut());
+            let (layout_, offset) = layout.extend(Layout::new::<Self>()).unwrap();
+            layout = layout_;
+            (sibling, offset)
+        });
 
         unsafe {
+            let ptr = alloc(layout.pad_to_align());
+            if ptr.is_null() {
+                handle_alloc_error(layout)
+            }
+
             ptr::write(ptr.offset(FLAGS_OFFSET), flags.bits() as u8);
             ptr::write(ptr.offset(LABEL_LEN_OFFSET), label.len() as u8);
             ptr::copy_nonoverlapping(label.as_ptr(), ptr.offset(LABEL_OFFSET), label.len());
 
-            let mut offset = LABEL_OFFSET + label.len() as isize;
-            if let Some(value) = value {
-                ptr::write(ptr.offset(offset) as _, value);
-                offset += mem::size_of::<V>() as isize;
+            if let Some((value, offset)) = value {
+                ptr::write(ptr.add(offset) as _, value);
             }
-            if let Some(child) = child {
-                ptr::write(ptr.offset(offset) as _, child);
-                offset += mem::size_of::<Self>() as isize;
+            if let Some((child, offset)) = child {
+                ptr::write(ptr.add(offset) as _, child);
             }
-            if let Some(sibling) = sibling {
-                ptr::write(ptr.offset(offset) as _, sibling);
+            if let Some((sibling, offset)) = sibling {
+                ptr::write(ptr.add(offset) as _, sibling);
             }
-        }
-        Node {
-            ptr,
-            _value: PhantomData,
+            Node {
+                ptr,
+                _value: PhantomData,
+            }
         }
     }
 
     #[cfg(feature = "binary-format")]
     pub(crate) fn new_for_decoding(flags: Flags, label_len: u8) -> Self {
         let mut init_flags = Flags::empty();
-        let mut block_size = LABEL_OFFSET as usize + label_len as usize;
+        let mut layout =
+            Layout::from_size_align(LABEL_OFFSET as usize + label_len as usize, 1).unwrap();
         if flags.contains(Flags::VALUE_INITIALIZED) {
             init_flags.insert(Flags::VALUE_ALLOCATED);
-            block_size += mem::size_of::<V>();
+            layout = layout.extend(Layout::new::<V>()).unwrap().0;
         }
         if flags.contains(Flags::CHILD_INITIALIZED) {
             init_flags.insert(Flags::CHILD_ALLOCATED);
-            block_size += mem::size_of::<Self>();
+            layout = layout.extend(Layout::new::<Self>()).unwrap().0;
         }
         if flags.contains(Flags::SIBLING_INITIALIZED) {
             init_flags.insert(Flags::SIBLING_ALLOCATED);
-            block_size += mem::size_of::<Self>();
+            layout = layout.extend(Layout::new::<Self>()).unwrap().0;
         }
-        let ptr = unsafe { libc::malloc(block_size) } as *mut u8;
+
+        let ptr = unsafe { alloc(layout.pad_to_align()) };
         assert_ne!(ptr, ptr::null_mut());
 
         unsafe {
@@ -284,7 +293,7 @@ impl<V> Node<V> {
                 self.set_flags(Flags::VALUE_INITIALIZED, false);
                 unsafe {
                     let value = self.ptr.offset(offset) as *const V;
-                    return Some(mem::transmute_copy(&*value));
+                    return Some(ptr::read(value));
                 }
             }
         }
@@ -298,7 +307,7 @@ impl<V> Node<V> {
                 self.set_flags(Flags::CHILD_INITIALIZED, false);
                 unsafe {
                     let child = self.ptr.offset(offset) as *mut Self;
-                    return Some(mem::transmute_copy(&*child));
+                    return Some(ptr::read(child));
                 }
             }
         }
@@ -312,7 +321,7 @@ impl<V> Node<V> {
                 self.set_flags(Flags::SIBLING_INITIALIZED, false);
                 unsafe {
                     let sibling = self.ptr.offset(offset) as *mut Self;
-                    return Some(mem::transmute_copy(&*sibling));
+                    return Some(ptr::read(sibling));
                 }
             }
         }
@@ -605,7 +614,10 @@ impl<V> Node<V> {
     fn value_offset(&self) -> Option<isize> {
         let flags = self.flags();
         if flags.contains(Flags::VALUE_ALLOCATED) {
-            Some(LABEL_OFFSET + self.label_len() as isize)
+            let layout =
+                Layout::from_size_align(LABEL_OFFSET as usize + self.label_len(), 1).unwrap();
+            let offset = layout.extend(Layout::new::<V>()).unwrap().1;
+            Some(offset as isize)
         } else {
             None
         }
@@ -613,11 +625,14 @@ impl<V> Node<V> {
     fn child_offset(&self) -> Option<isize> {
         let flags = self.flags();
         if flags.contains(Flags::CHILD_ALLOCATED) {
-            let mut offset = LABEL_OFFSET + self.label_len() as isize;
+            let mut layout =
+                Layout::from_size_align(LABEL_OFFSET as usize + self.label_len(), 1).unwrap();
+
             if flags.contains(Flags::VALUE_ALLOCATED) {
-                offset += mem::size_of::<V>() as isize;
+                layout = layout.extend(Layout::new::<V>()).unwrap().0;
             }
-            Some(offset)
+            let offset = layout.extend(Layout::new::<Self>()).unwrap().1;
+            Some(offset as isize)
         } else {
             None
         }
@@ -625,14 +640,17 @@ impl<V> Node<V> {
     fn sibling_offset(&self) -> Option<isize> {
         let flags = self.flags();
         if flags.contains(Flags::SIBLING_ALLOCATED) {
-            let mut offset = LABEL_OFFSET + self.label_len() as isize;
+            let mut layout =
+                Layout::from_size_align(LABEL_OFFSET as usize + self.label_len(), 1).unwrap();
+
             if flags.contains(Flags::VALUE_ALLOCATED) {
-                offset += mem::size_of::<V>() as isize;
+                layout = layout.extend(Layout::new::<V>()).unwrap().0;
             }
             if flags.contains(Flags::CHILD_ALLOCATED) {
-                offset += mem::size_of::<usize>() as isize;
+                layout = layout.extend(Layout::new::<Self>()).unwrap().0;
             }
-            Some(offset)
+            let offset = layout.extend(Layout::new::<Self>()).unwrap().1;
+            Some(offset as isize)
         } else {
             None
         }
@@ -696,7 +714,25 @@ impl<V> Drop for Node<V> {
             let _ = self.take_value();
             let _ = self.take_child();
             let _ = self.take_sibling();
-            libc::free(self.ptr as *mut libc::c_void)
+
+            let mut layout =
+                Layout::from_size_align_unchecked(LABEL_OFFSET as usize + self.label_len(), 1);
+
+            (|| -> Result<_, LayoutErr> {
+                if self.flags().contains(Flags::VALUE_ALLOCATED) {
+                    layout = layout.extend(Layout::new::<V>())?.0;
+                }
+                if self.flags().contains(Flags::CHILD_ALLOCATED) {
+                    layout = layout.extend(Layout::new::<Self>())?.0;
+                }
+                if self.flags().contains(Flags::SIBLING_ALLOCATED) {
+                    layout = layout.extend(Layout::new::<Self>())?.0;
+                }
+                Ok(())
+            })()
+            .unwrap();
+
+            dealloc(self.ptr, layout.pad_to_align())
         }
     }
 }
