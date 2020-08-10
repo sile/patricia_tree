@@ -49,7 +49,7 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
-    pub(crate) fn common_prefixes<'a, K>(&'a self, key: K) -> node::CommonPrefixesIter<'a, K, V>
+    pub(crate) fn common_prefixes<K>(&self, key: K) -> node::CommonPrefixesIter<K, V>
     where
         K: AsRef<[u8]>,
     {

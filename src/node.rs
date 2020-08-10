@@ -405,7 +405,7 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn common_prefixes<'a, K>(&'a self, key: K) -> CommonPrefixesIter<'a, K, V>
+    pub(crate) fn common_prefixes<K>(&self, key: K) -> CommonPrefixesIter<K, V>
     where
         K: AsRef<[u8]>,
     {
