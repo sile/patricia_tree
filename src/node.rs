@@ -54,7 +54,8 @@ pub struct Node<V> {
 
     _value: PhantomData<V>,
 }
-unsafe impl<V> Send for Node<V> {}
+unsafe impl<V: Send> Send for Node<V> {}
+unsafe impl<V: Sync> Sync for Node<V> {}
 impl<V> Node<V> {
     /// Makes a new node which represents an empty tree.
     ///
