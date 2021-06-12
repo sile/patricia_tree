@@ -1,8 +1,9 @@
 use crate::node::{self, Node};
+use std::alloc::{GlobalAlloc, System};
 
 #[derive(Debug, Clone)]
-pub struct PatriciaTree<V> {
-    root: Node<V>,
+pub struct PatriciaTree<V, A: Clone + GlobalAlloc = System> {
+    root: Node<V, A>,
     len: usize,
 }
 
@@ -13,10 +14,20 @@ impl<V> PatriciaTree<V> {
             len: 0,
         }
     }
-    pub fn into_root(self) -> Node<V> {
+}
+
+impl<V, A: Clone + GlobalAlloc> PatriciaTree<V, A> {
+    pub fn new_in(allocator: A) -> Self {
+        PatriciaTree {
+            root: Node::root_in(allocator),
+            len: 0,
+        }
+    }
+
+    pub fn into_root(self) -> Node<V, A> {
         self.root
     }
-    pub fn root(&self) -> &Node<V> {
+    pub fn root(&self) -> &Node<V, A> {
         &self.root
     }
     pub fn insert<K: AsRef<[u8]>>(&mut self, key: K, value: V) -> Option<V> {
@@ -38,7 +49,7 @@ impl<V> PatriciaTree<V> {
             .get_longest_common_prefix(key, 0)
             .map(|(n, v)| (&key[..n], v))
     }
-    pub fn iter_prefix<'a, 'b>(&'a self, prefix: &'b [u8]) -> Option<(usize, Nodes<V>)> {
+    pub fn iter_prefix<'a, 'b>(&'a self, prefix: &'b [u8]) -> Option<(usize, Nodes<V, A>)> {
         if let Some((common_prefix_len, node)) = self.root.get_prefix_node(prefix, 0) {
             let nodes = Nodes {
                 nodes: node.iter_descendant(),
@@ -49,7 +60,7 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
-    pub(crate) fn common_prefixes<K>(&self, key: K) -> node::CommonPrefixesIter<K, V>
+    pub(crate) fn common_prefixes<K>(&self, key: K) -> node::CommonPrefixesIter<K, V, A>
     where
         K: AsRef<[u8]>,
     {
@@ -65,43 +76,50 @@ impl<V> PatriciaTree<V> {
     }
     pub fn split_by_prefix<K: AsRef<[u8]>>(&mut self, prefix: K) -> Self {
         if let Some(splitted_root) = self.root.split_by_prefix(prefix.as_ref()) {
-            let mut splitted_root = Node::new(prefix.as_ref(), None, Some(splitted_root), None);
+            let mut splitted_root = Node::new_in(
+                prefix.as_ref(),
+                None,
+                Some(splitted_root),
+                None,
+                self.root.allocator.clone(),
+            );
             splitted_root.try_merge_with_child();
 
             let splitted = Self::from(splitted_root);
             self.len -= splitted.len();
             splitted
         } else {
-            Self::new()
+            Self::new_in(self.root.allocator.clone())
         }
     }
     pub fn clear(&mut self) {
-        self.root = Node::root();
+        self.root = Node::root_in(self.root.allocator.clone());
         self.len = 0;
     }
     pub fn len(&self) -> usize {
         self.len
     }
-    pub fn nodes(&self) -> Nodes<V> {
+    pub fn nodes(&self) -> Nodes<V, A> {
         Nodes {
             nodes: self.root.iter(),
             label_lens: Vec::new(),
         }
     }
-    pub fn into_nodes(self) -> IntoNodes<V> {
+    pub fn into_nodes(self) -> IntoNodes<V, A> {
         IntoNodes {
             nodes: self.root.into_iter(),
             label_lens: Vec::new(),
         }
     }
 }
-impl<V> Default for PatriciaTree<V> {
+impl<V, A: Clone + GlobalAlloc + Default> Default for PatriciaTree<V, A> {
     fn default() -> Self {
-        Self::new()
+        Self::new_in(Default::default())
     }
 }
-impl<V> From<Node<V>> for PatriciaTree<V> {
-    fn from(f: Node<V>) -> Self {
+
+impl<V, A: Clone + GlobalAlloc> From<Node<V, A>> for PatriciaTree<V, A> {
+    fn from(f: Node<V, A>) -> Self {
         let mut this = PatriciaTree { root: f, len: 0 };
         let count = this.nodes().filter(|n| n.1.value().is_some()).count();
         this.len = count;
@@ -110,12 +128,12 @@ impl<V> From<Node<V>> for PatriciaTree<V> {
 }
 
 #[derive(Debug)]
-pub struct Nodes<'a, V: 'a> {
-    nodes: node::Iter<'a, V>,
+pub struct Nodes<'a, V: 'a, A: Clone + GlobalAlloc> {
+    nodes: node::Iter<'a, V, A>,
     label_lens: Vec<usize>,
 }
-impl<'a, V: 'a> Iterator for Nodes<'a, V> {
-    type Item = (usize, &'a Node<V>);
+impl<'a, V: 'a, A: Clone + GlobalAlloc> Iterator for Nodes<'a, V, A> {
+    type Item = (usize, &'a Node<V, A>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, node)) = self.nodes.next() {
             self.label_lens.resize(level + 1, 0);
@@ -130,12 +148,12 @@ impl<'a, V: 'a> Iterator for Nodes<'a, V> {
 }
 
 #[derive(Debug)]
-pub struct IntoNodes<V> {
-    nodes: node::IntoIter<V>,
+pub struct IntoNodes<V, A: Clone + GlobalAlloc> {
+    nodes: node::IntoIter<V, A>,
     label_lens: Vec<usize>,
 }
-impl<V> Iterator for IntoNodes<V> {
-    type Item = (usize, Node<V>);
+impl<V, A: Clone + GlobalAlloc> Iterator for IntoNodes<V, A> {
+    type Item = (usize, Node<V, A>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, node)) = self.nodes.next() {
             self.label_lens.resize(level + 1, 0);

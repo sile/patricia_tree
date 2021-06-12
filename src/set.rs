@@ -1,13 +1,14 @@
 //! A set based on a patricia tree.
 use crate::map::{self, PatriciaMap};
 use crate::node::Node;
+use std::alloc::{GlobalAlloc, System};
 use std::fmt;
 use std::iter::FromIterator;
 
 /// A set based on a patricia tree.
 #[derive(Default, Clone)]
-pub struct PatriciaSet {
-    map: PatriciaMap<()>,
+pub struct PatriciaSet<A: Clone + GlobalAlloc = System> {
+    map: PatriciaMap<(), A>,
 }
 
 impl PatriciaSet {
@@ -26,7 +27,9 @@ impl PatriciaSet {
             map: PatriciaMap::new(),
         }
     }
+}
 
+impl<A: Clone + GlobalAlloc> PatriciaSet<A> {
     /// Returns the number of elements in this set.
     ///
     /// # Examples
@@ -195,7 +198,7 @@ impl PatriciaSet {
     ///
     /// assert_eq!(set.iter().collect::<Vec<_>>(), [Vec::from("bar"), "baz".into(), "foo".into()]);
     /// ```
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<A> {
         Iter(self.map.keys())
     }
 
@@ -220,7 +223,7 @@ impl PatriciaSet {
         self.map.iter_prefix(prefix).map(|(k, _)| k)
     }
 }
-impl fmt::Debug for PatriciaSet {
+impl<A: Clone + GlobalAlloc> fmt::Debug for PatriciaSet<A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{")?;
         for (i, t) in self.iter().enumerate() {
@@ -233,9 +236,9 @@ impl fmt::Debug for PatriciaSet {
         Ok(())
     }
 }
-impl IntoIterator for PatriciaSet {
+impl<A: Clone + GlobalAlloc> IntoIterator for PatriciaSet<A> {
     type Item = Vec<u8>;
-    type IntoIter = IntoIter;
+    type IntoIter = IntoIter<A>;
     fn into_iter(self) -> Self::IntoIter {
         IntoIter(self.map.into_iter())
     }
@@ -252,7 +255,7 @@ impl<T: AsRef<[u8]>> FromIterator<T> for PatriciaSet {
         set
     }
 }
-impl<T: AsRef<[u8]>> Extend<T> for PatriciaSet {
+impl<A: Clone + GlobalAlloc, T: AsRef<[u8]>> Extend<T> for PatriciaSet<A> {
     fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = T>,
@@ -262,26 +265,26 @@ impl<T: AsRef<[u8]>> Extend<T> for PatriciaSet {
         }
     }
 }
-impl From<Node<()>> for PatriciaSet {
-    fn from(f: Node<()>) -> Self {
+impl<A: Clone + GlobalAlloc> From<Node<(), A>> for PatriciaSet<A> {
+    fn from(f: Node<(), A>) -> Self {
         PatriciaSet { map: f.into() }
     }
 }
-impl From<PatriciaSet> for Node<()> {
-    fn from(f: PatriciaSet) -> Self {
+impl<A: Clone + GlobalAlloc> From<PatriciaSet<A>> for Node<(), A> {
+    fn from(f: PatriciaSet<A>) -> Self {
         f.map.into()
     }
 }
-impl AsRef<Node<()>> for PatriciaSet {
-    fn as_ref(&self) -> &Node<()> {
+impl<A: Clone + GlobalAlloc> AsRef<Node<(), A>> for PatriciaSet<A> {
+    fn as_ref(&self) -> &Node<(), A> {
         self.map.as_ref()
     }
 }
 
 /// An Iterator over a `PatriciaSet`'s items.
 #[derive(Debug)]
-pub struct Iter<'a>(map::Keys<'a, ()>);
-impl<'a> Iterator for Iter<'a> {
+pub struct Iter<'a, A: Clone + GlobalAlloc>(map::Keys<'a, (), A>);
+impl<'a, A: Clone + GlobalAlloc> Iterator for Iter<'a, A> {
     type Item = Vec<u8>;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
@@ -290,8 +293,8 @@ impl<'a> Iterator for Iter<'a> {
 
 /// An owning iterator over a `PatriciaSet`'s items.
 #[derive(Debug)]
-pub struct IntoIter(map::IntoIter<()>);
-impl Iterator for IntoIter {
+pub struct IntoIter<A: Clone + GlobalAlloc>(map::IntoIter<(), A>);
+impl<A: Clone + GlobalAlloc> Iterator for IntoIter<A> {
     type Item = Vec<u8>;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(|(k, _)| k)

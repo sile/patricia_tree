@@ -1,5 +1,6 @@
 //! A node which represents a subtree of a patricia tree.
-use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
+use std::alloc::{handle_alloc_error, Layout};
+use std::alloc::{GlobalAlloc, System};
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
@@ -42,20 +43,22 @@ const MAX_LABEL_LEN: usize = 255;
 /// Note that this is a low level building block.
 /// Usually it is recommended to use more high level data structures (e.g., `PatriciaTree`).
 #[derive(Debug)]
-pub struct Node<V> {
+pub struct Node<V, A: Clone + GlobalAlloc = System> {
     // layout:
     //   - flags: u8
     //   - label_len: u8
     //   - label: [u8; label_len]
     //   - value: Option<V>
-    //   - child: Option<Node<V>>
-    //   - sibling: Option<Node<V>>
+    //   - child: Option<Node<V, A>>
+    //   - sibling: Option<Node<V, A>>
     ptr: *mut u8,
 
+    pub(crate) allocator: A,
     _value: PhantomData<V>,
 }
-unsafe impl<V: Send> Send for Node<V> {}
-unsafe impl<V: Sync> Sync for Node<V> {}
+unsafe impl<V: Send, A: Clone + GlobalAlloc> Send for Node<V, A> {}
+unsafe impl<V: Sync, A: Clone + GlobalAlloc> Sync for Node<V, A> {}
+
 impl<V> Node<V> {
     /// Makes a new node which represents an empty tree.
     ///
@@ -71,7 +74,7 @@ impl<V> Node<V> {
     /// assert!(node.sibling().is_none());
     /// ```
     pub fn root() -> Self {
-        Node::new(b"", None, None, None)
+        Node::root_in(System)
     }
 
     /// Makes a new node.
@@ -103,14 +106,33 @@ impl<V> Node<V> {
     /// assert_eq!(node2.child().unwrap().value(), Some(&4));
     /// assert_eq!(node2.child().unwrap().child().unwrap().label(), b"bar");
     /// ```
-    pub fn new(
+    pub fn new(label: &[u8], value: Option<V>, child: Option<Self>, sibling: Option<Self>) -> Self {
+        Node::new_in(label, value, child, sibling, System)
+    }
+}
+
+impl<V, A: Clone + GlobalAlloc> Node<V, A> {
+    /// Like [`root`], but creating the node using a custom [`std::alloc::GlobalAlloc`].
+    pub fn root_in(allocator: A) -> Self {
+        Node::new_in(b"", None, None, None, allocator)
+    }
+
+    /// Like [`new`], but creating the node using a custom [`std::alloc::GlobalAlloc`].
+    pub fn new_in(
         mut label: &[u8],
         mut value: Option<V>,
         mut child: Option<Self>,
         sibling: Option<Self>,
+        allocator: A,
     ) -> Self {
         if label.len() > MAX_LABEL_LEN {
-            child = Some(Node::new(&label[MAX_LABEL_LEN..], value, child, None));
+            child = Some(Node::new_in(
+                &label[MAX_LABEL_LEN..],
+                value,
+                child,
+                None,
+                allocator.clone(),
+            ));
             label = &label[..MAX_LABEL_LEN];
             value = None;
         }
@@ -137,7 +159,7 @@ impl<V> Node<V> {
         });
 
         unsafe {
-            let ptr = alloc(layout.pad_to_align());
+            let ptr = allocator.alloc(layout.pad_to_align());
             if ptr.is_null() {
                 handle_alloc_error(layout)
             }
@@ -158,12 +180,13 @@ impl<V> Node<V> {
             Node {
                 ptr,
                 _value: PhantomData,
+                allocator,
             }
         }
     }
 
     #[cfg(feature = "binary-format")]
-    pub(crate) fn new_for_decoding(flags: Flags, label_len: u8) -> Self {
+    pub(crate) fn new_for_decoding_in(flags: Flags, label_len: u8, allocator: A) -> Self {
         let mut init_flags = Flags::empty();
         let mut layout = Self::initial_layout(label_len as usize);
         if flags.contains(Flags::VALUE_INITIALIZED) {
@@ -179,7 +202,7 @@ impl<V> Node<V> {
             layout = layout.extend(Layout::new::<Self>()).expect("unreachable").0;
         }
 
-        let ptr = unsafe { alloc(layout.pad_to_align()) };
+        let ptr = unsafe { A::alloc(layout.pad_to_align()) };
         assert_ne!(ptr, ptr::null_mut());
 
         unsafe {
@@ -189,6 +212,7 @@ impl<V> Node<V> {
         Node {
             ptr,
             _value: PhantomData,
+            allocator,
         }
     }
 
@@ -337,7 +361,13 @@ impl<V> Node<V> {
         } else {
             let child = self.take_child();
             let sibling = self.take_sibling();
-            let node = Node::new(self.label(), Some(value), child, sibling);
+            let node = Node::new_in(
+                self.label(),
+                Some(value),
+                child,
+                sibling,
+                self.allocator.clone(),
+            );
             *self = node;
         }
     }
@@ -351,7 +381,13 @@ impl<V> Node<V> {
         } else {
             let value = self.take_value();
             let sibling = self.take_sibling();
-            let node = Node::new(self.label(), value, Some(child), sibling);
+            let node = Node::new_in(
+                self.label(),
+                value,
+                Some(child),
+                sibling,
+                self.allocator.clone(),
+            );
             *self = node;
         }
     }
@@ -365,7 +401,13 @@ impl<V> Node<V> {
         } else {
             let value = self.take_value();
             let child = self.take_child();
-            let node = Node::new(self.label(), value, child, Some(sibling));
+            let node = Node::new_in(
+                self.label(),
+                value,
+                child,
+                Some(sibling),
+                self.allocator.clone(),
+            );
             *self = node;
         }
     }
@@ -394,19 +436,19 @@ impl<V> Node<V> {
     ///                (1, "foo".as_ref())
     ///            ]);
     /// ```
-    pub fn iter(&self) -> Iter<V> {
+    pub fn iter(&self) -> Iter<V, A> {
         Iter {
             stack: vec![(0, self)],
         }
     }
 
-    pub(crate) fn iter_descendant(&self) -> Iter<V> {
+    pub(crate) fn iter_descendant(&self) -> Iter<V, A> {
         Iter {
             stack: vec![(0, self)],
         }
     }
 
-    pub(crate) fn common_prefixes<K>(&self, key: K) -> CommonPrefixesIter<K, V>
+    pub(crate) fn common_prefixes<K>(&self, key: K) -> CommonPrefixesIter<K, V, A>
     where
         K: AsRef<[u8]>,
     {
@@ -492,7 +534,13 @@ impl<V> Node<V> {
         if common_prefix_len == prefix.len() {
             let value = self.take_value();
             let child = self.take_child();
-            let node = Node::new(&self.label()[common_prefix_len..], value, child, None);
+            let node = Node::new_in(
+                &self.label()[common_prefix_len..],
+                value,
+                child,
+                None,
+                self.allocator.clone(),
+            );
             if let Some(sibling) = self.take_sibling() {
                 *self = sibling;
             }
@@ -549,11 +597,12 @@ impl<V> Node<V> {
     }
     pub(crate) fn insert(&mut self, key: &[u8], value: V) -> Option<V> {
         if self.label().get(0) > key.get(0) {
-            let this = Node {
+            let this: Node<V, A> = Node {
                 ptr: self.ptr,
                 _value: PhantomData,
+                allocator: self.allocator.clone(),
             };
-            let node = Node::new(key, Some(value), None, Some(this));
+            let node = Node::new_in(key, Some(value), None, Some(this), self.allocator.clone());
             self.ptr = node.ptr;
             mem::forget(node);
             return None;
@@ -576,14 +625,14 @@ impl<V> Node<V> {
             if let Some(child) = self.child_mut() {
                 return child.insert(next, value);
             }
-            let child = Node::new(next, Some(value), None, None);
+            let child = Node::new_in(next, Some(value), None, None, self.allocator.clone());
             self.set_child(child);
             None
         } else if common_prefix_len == 0 {
             if let Some(sibling) = self.sibling_mut() {
                 return sibling.insert(next, value);
             }
-            let sibling = Node::new(next, Some(value), None, None);
+            let sibling = Node::new_in(next, Some(value), None, None, self.allocator.clone());
             self.set_sibling(sibling);
             None
         } else {
@@ -656,8 +705,20 @@ impl<V> Node<V> {
         let child = self.take_child();
         let sibling = self.take_sibling();
 
-        let child = Node::new(&self.label()[position..], value, child, None);
-        let parent = Node::new(&self.label()[..position], None, Some(child), sibling);
+        let child = Node::new_in(
+            &self.label()[position..],
+            value,
+            child,
+            None,
+            self.allocator.clone(),
+        );
+        let parent = Node::new_in(
+            &self.label()[..position],
+            None,
+            Some(child),
+            sibling,
+            self.allocator.clone(),
+        );
         *self = parent;
     }
     fn try_reclaim_sibling(&mut self) {
@@ -697,7 +758,7 @@ impl<V> Node<V> {
             let mut label = Vec::with_capacity(self.label_len() + child.label_len());
             label.extend(self.label());
             label.extend(child.label());
-            let node = Self::new(&label, value, grandchild, sibling);
+            let node = Self::new_in(&label, value, grandchild, sibling, self.allocator.clone());
             *self = node;
         }
     }
@@ -708,7 +769,7 @@ impl<V> Node<V> {
     }
 }
 
-impl<V> Drop for Node<V> {
+impl<V, A: Clone + GlobalAlloc> Drop for Node<V, A> {
     fn drop(&mut self) {
         let _ = self.take_value();
         let _ = self.take_child();
@@ -725,21 +786,21 @@ impl<V> Drop for Node<V> {
             layout = layout.extend(Layout::new::<Self>()).expect("unreachable").0;
         }
 
-        unsafe { dealloc(self.ptr, layout.pad_to_align()) }
+        unsafe { self.allocator.dealloc(self.ptr, layout.pad_to_align()) }
     }
 }
-impl<V: Clone> Clone for Node<V> {
+impl<V: Clone, A: Clone + GlobalAlloc> Clone for Node<V, A> {
     fn clone(&self) -> Self {
         let label = self.label();
         let value = self.value().cloned();
         let child = self.child().cloned();
         let sibling = self.sibling().cloned();
-        Node::new(label, value, child, sibling)
+        Node::new_in(label, value, child, sibling, self.allocator.clone())
     }
 }
-impl<V> IntoIterator for Node<V> {
-    type Item = (usize, Node<V>);
-    type IntoIter = IntoIter<V>;
+impl<V, A: Clone + GlobalAlloc> IntoIterator for Node<V, A> {
+    type Item = (usize, Node<V, A>);
+    type IntoIter = IntoIter<V, A>;
     fn into_iter(self) -> Self::IntoIter {
         IntoIter {
             stack: vec![(0, self)],
@@ -751,11 +812,11 @@ impl<V> IntoIterator for Node<V> {
 ///
 /// The first element of an item is the level of the traversing node.
 #[derive(Debug)]
-pub struct Iter<'a, V: 'a> {
-    stack: Vec<(usize, &'a Node<V>)>,
+pub struct Iter<'a, V: 'a, A: Clone + GlobalAlloc> {
+    stack: Vec<(usize, &'a Node<V, A>)>,
 }
-impl<'a, V: 'a> Iterator for Iter<'a, V> {
-    type Item = (usize, &'a Node<V>);
+impl<'a, V: 'a, A: Clone + GlobalAlloc> Iterator for Iter<'a, V, A> {
+    type Item = (usize, &'a Node<V, A>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, node)) = self.stack.pop() {
             if level != 0 {
@@ -776,16 +837,16 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
 /// An iterator over entries in that collects all values up to
 /// until the key stops matching.
 #[derive(Debug)]
-pub(crate) struct CommonPrefixesIter<'a, K, V> {
+pub(crate) struct CommonPrefixesIter<'a, K, V, A: Clone + GlobalAlloc> {
     key: K,
-    stack: Vec<(usize, &'a Node<V>)>,
+    stack: Vec<(usize, &'a Node<V, A>)>,
 }
 
-impl<'a, K, V> Iterator for CommonPrefixesIter<'a, K, V>
+impl<'a, K, V, A: Clone + GlobalAlloc> Iterator for CommonPrefixesIter<'a, K, V, A>
 where
     K: AsRef<[u8]>,
 {
-    type Item = (usize, &'a Node<V>);
+    type Item = (usize, &'a Node<V, A>);
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((offset, node)) = self.stack.pop() {
             let common_prefix_len = node.skip_common_prefix(&self.key.as_ref()[offset..]);
@@ -811,11 +872,11 @@ where
 ///
 /// The first element of an item is the level of the traversing node.
 #[derive(Debug)]
-pub struct IntoIter<V> {
-    stack: Vec<(usize, Node<V>)>,
+pub struct IntoIter<V, A: Clone + GlobalAlloc> {
+    stack: Vec<(usize, Node<V, A>)>,
 }
-impl<V> Iterator for IntoIter<V> {
-    type Item = (usize, Node<V>);
+impl<V, A: Clone + GlobalAlloc> Iterator for IntoIter<V, A> {
+    type Item = (usize, Node<V, A>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, mut node)) = self.stack.pop() {
             if let Some(sibling) = node.take_sibling() {

@@ -25,15 +25,15 @@ use std::cmp;
 /// }
 /// ```
 #[derive(Debug, Default)]
-pub struct NodeDecoder<V: Decode> {
-    stack: Vec<(u16, Node<V::Item>)>,
-    node: Option<(u16, Node<V::Item>)>,
+pub struct NodeDecoder<V: Decode, A> {
+    stack: Vec<(u16, Node<V::Item, A>)>,
+    node: Option<(u16, Node<V::Item, A>)>,
     label_offset: usize,
     header_decoder: HeaderDecoder,
     value_decoder: Omittable<V>,
     decoded: Option<Node<V::Item>>,
 }
-impl<V: Decode> NodeDecoder<V> {
+impl<V: Decode, A: Clone + GlobalAlloc> NodeDecoder<V> {
     /// Makes a new `NodeDecoder` instance.
     pub fn new(value_decoder: V) -> Self {
         NodeDecoder {
@@ -46,8 +46,8 @@ impl<V: Decode> NodeDecoder<V> {
         }
     }
 }
-impl<V: Decode> Decode for NodeDecoder<V> {
-    type Item = Node<V::Item>;
+impl<V: Decode, A: Clone + GlobalAlloc> Decode for NodeDecoder<V> {
+    type Item = Node<V::Item, A>;
 
     fn decode(&mut self, buf: &[u8], eos: Eos) -> Result<usize> {
         if self.is_idle() {
@@ -152,14 +152,14 @@ impl<V: Decode> Decode for NodeDecoder<V> {
 /// }
 /// ```
 #[derive(Debug, Default)]
-pub struct NodeEncoder<V: Encode> {
-    stack: Vec<(u16, Node<V::Item>)>,
+pub struct NodeEncoder<V: Encode, A> {
+    stack: Vec<(u16, Node<V::Item, A>)>,
     header_encoder: HeaderEncoder,
     label_offset: usize,
     value_encoder: V,
     in_progress: bool,
 }
-impl<V: Encode> NodeEncoder<V> {
+impl<V: Encode, A: Clone + GlobalAlloc> NodeEncoder<V> {
     /// Makes a new `NodeEncoder` instance.
     pub fn new(value_encoder: V) -> Self {
         NodeEncoder {
@@ -171,8 +171,8 @@ impl<V: Encode> NodeEncoder<V> {
         }
     }
 }
-impl<V: Encode> Encode for NodeEncoder<V> {
-    type Item = Node<V::Item>;
+impl<V: Encode, A: Clone + GlobalAlloc> Encode for NodeEncoder<V> {
+    type Item = Node<V::Item, A>;
 
     fn encode(&mut self, buf: &mut [u8], eos: Eos) -> Result<usize> {
         let mut offset = 0;
@@ -304,7 +304,7 @@ struct Header {
     level: u16,
 }
 impl Header {
-    fn new<V>(level: u16, node: &Node<V>) -> Self {
+    fn new<V>(level: u16, node: &Node<V, A>) -> Self {
         Header {
             flags: node.flags(),
             label_len: node.label().len() as u8,

@@ -1,13 +1,14 @@
 //! A map based on a patricia tree.
 use crate::node::Node;
 use crate::tree::{self, PatriciaTree};
+use std::alloc::{GlobalAlloc, System};
 use std::fmt;
 use std::iter::FromIterator;
 
 /// A map based on a patricia tree.
 #[derive(Clone)]
-pub struct PatriciaMap<V> {
-    tree: PatriciaTree<V>,
+pub struct PatriciaMap<V, A: Clone + GlobalAlloc = System> {
+    tree: PatriciaTree<V, A>,
 }
 
 impl<V> PatriciaMap<V> {
@@ -31,6 +32,27 @@ impl<V> PatriciaMap<V> {
     pub fn new() -> Self {
         PatriciaMap {
             tree: PatriciaTree::new(),
+        }
+    }
+}
+
+impl<V, A: Clone + GlobalAlloc> PatriciaMap<V, A> {
+    /// Same as `new`, but using a custom [`std::alloc::GlobalAlloc`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::alloc::System;
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map = PatriciaMap::new_in(System);
+    /// map.insert("foo", 10);
+    /// assert_eq!(map.len(), 1);
+    /// ```
+    ///
+    pub fn new_in(allocator: A) -> Self {
+        PatriciaMap {
+            tree: PatriciaTree::new_in(allocator),
         }
     }
 
@@ -289,7 +311,7 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(vec![(Vec::from("bar"), &2), ("baz".into(), &3), ("foo".into(), &1)],
     ///            map.iter().collect::<Vec<_>>());
     /// ```
-    pub fn iter(&self) -> Iter<V> {
+    pub fn iter(&self) -> Iter<V, A> {
         Iter::new(self.tree.nodes(), Vec::new())
     }
 
@@ -307,7 +329,7 @@ impl<V> PatriciaMap<V> {
     /// }
     /// assert_eq!(map.get("bar"), Some(&12));
     /// ```
-    pub fn iter_mut(&mut self) -> IterMut<V> {
+    pub fn iter_mut(&mut self) -> IterMut<V, A> {
         IterMut {
             nodes: self.tree.nodes(),
             key: Vec::new(),
@@ -351,7 +373,7 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(vec![Vec::from("bar"), "baz".into(), "foo".into()],
     ///            map.keys().collect::<Vec<_>>());
     /// ```
-    pub fn keys(&self) -> Keys<V> {
+    pub fn keys(&self) -> Keys<V, A> {
         Keys(self.iter())
     }
 
@@ -367,7 +389,7 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(vec![2, 3, 1],
     ///            map.values().cloned().collect::<Vec<_>>());
     /// ```
-    pub fn values(&self) -> Values<V> {
+    pub fn values(&self) -> Values<V, A> {
         Values {
             nodes: self.tree.nodes(),
         }
@@ -388,13 +410,13 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(vec![12, 13, 11],
     ///            map.values().cloned().collect::<Vec<_>>());
     /// ```
-    pub fn values_mut(&mut self) -> ValuesMut<V> {
+    pub fn values_mut(&mut self) -> ValuesMut<V, A> {
         ValuesMut {
             nodes: self.tree.nodes(),
         }
     }
 }
-impl<V: fmt::Debug> fmt::Debug for PatriciaMap<V> {
+impl<V: fmt::Debug, A: Clone + GlobalAlloc> fmt::Debug for PatriciaMap<V, A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{")?;
         for (i, (k, v)) in self.iter().enumerate() {
@@ -407,14 +429,14 @@ impl<V: fmt::Debug> fmt::Debug for PatriciaMap<V> {
         Ok(())
     }
 }
-impl<V> Default for PatriciaMap<V> {
+impl<V, A: Clone + GlobalAlloc + Default> Default for PatriciaMap<V, A> {
     fn default() -> Self {
-        Self::new()
+        Self::new_in(Default::default())
     }
 }
-impl<V> IntoIterator for PatriciaMap<V> {
+impl<V, A: Clone + GlobalAlloc> IntoIterator for PatriciaMap<V, A> {
     type Item = (Vec<u8>, V);
-    type IntoIter = IntoIter<V>;
+    type IntoIter = IntoIter<V, A>;
     fn into_iter(self) -> Self::IntoIter {
         IntoIter {
             nodes: self.tree.into_nodes(),
@@ -437,7 +459,7 @@ where
         map
     }
 }
-impl<K, V> Extend<(K, V)> for PatriciaMap<V>
+impl<K, V, A: Clone + GlobalAlloc> Extend<(K, V)> for PatriciaMap<V, A>
 where
     K: AsRef<[u8]>,
 {
@@ -450,31 +472,31 @@ where
         }
     }
 }
-impl<V> From<Node<V>> for PatriciaMap<V> {
-    fn from(f: Node<V>) -> Self {
+impl<V, A: Clone + GlobalAlloc> From<Node<V, A>> for PatriciaMap<V, A> {
+    fn from(f: Node<V, A>) -> Self {
         PatriciaMap { tree: f.into() }
     }
 }
-impl<V> From<PatriciaMap<V>> for Node<V> {
-    fn from(f: PatriciaMap<V>) -> Self {
+impl<V, A: Clone + GlobalAlloc> From<PatriciaMap<V, A>> for Node<V, A> {
+    fn from(f: PatriciaMap<V, A>) -> Self {
         f.tree.into_root()
     }
 }
-impl<V> AsRef<Node<V>> for PatriciaMap<V> {
-    fn as_ref(&self) -> &Node<V> {
+impl<V, A: Clone + GlobalAlloc> AsRef<Node<V, A>> for PatriciaMap<V, A> {
+    fn as_ref(&self) -> &Node<V, A> {
         self.tree.root()
     }
 }
 
 /// An iterator over a `PatriciaMap`'s entries.
 #[derive(Debug)]
-pub struct Iter<'a, V: 'a> {
-    nodes: tree::Nodes<'a, V>,
+pub struct Iter<'a, V: 'a, A: Clone + GlobalAlloc> {
+    nodes: tree::Nodes<'a, V, A>,
     key: Vec<u8>,
     key_offset: usize,
 }
-impl<'a, V: 'a> Iter<'a, V> {
-    fn new(nodes: tree::Nodes<'a, V>, key: Vec<u8>) -> Self {
+impl<'a, V: 'a, A: Clone + GlobalAlloc> Iter<'a, V, A> {
+    fn new(nodes: tree::Nodes<'a, V, A>, key: Vec<u8>) -> Self {
         let key_offset = key.len();
         Self {
             nodes,
@@ -483,7 +505,7 @@ impl<'a, V: 'a> Iter<'a, V> {
         }
     }
 }
-impl<'a, V: 'a> Iterator for Iter<'a, V> {
+impl<'a, V: 'a, A: Clone + GlobalAlloc> Iterator for Iter<'a, V, A> {
     type Item = (Vec<u8>, &'a V);
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((key_len, node)) = self.nodes.next() {
@@ -499,11 +521,11 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
 
 /// An owning iterator over a `PatriciaMap`'s entries.
 #[derive(Debug)]
-pub struct IntoIter<V> {
-    nodes: tree::IntoNodes<V>,
+pub struct IntoIter<V, A: Clone + GlobalAlloc> {
+    nodes: tree::IntoNodes<V, A>,
     key: Vec<u8>,
 }
-impl<V> Iterator for IntoIter<V> {
+impl<V, A: Clone + GlobalAlloc> Iterator for IntoIter<V, A> {
     type Item = (Vec<u8>, V);
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((key_len, mut node)) = self.nodes.next() {
@@ -519,11 +541,11 @@ impl<V> Iterator for IntoIter<V> {
 
 /// A mutable iterator over a `PatriciaMap`'s entries.
 #[derive(Debug)]
-pub struct IterMut<'a, V: 'a> {
-    nodes: tree::Nodes<'a, V>,
+pub struct IterMut<'a, V: 'a, A: Clone + GlobalAlloc> {
+    nodes: tree::Nodes<'a, V, A>,
     key: Vec<u8>,
 }
-impl<'a, V: 'a> Iterator for IterMut<'a, V> {
+impl<'a, V: 'a, A: Clone + GlobalAlloc> Iterator for IterMut<'a, V, A> {
     type Item = (Vec<u8>, &'a mut V);
     #[allow(mutable_transmutes)]
     fn next(&mut self) -> Option<Self::Item> {
@@ -531,7 +553,7 @@ impl<'a, V: 'a> Iterator for IterMut<'a, V> {
             self.key.truncate(key_len);
             self.key.extend(node.label());
 
-            let node = unsafe { &mut *(node as *const _ as *mut Node<V>) };
+            let node = unsafe { &mut *(node as *const _ as *mut Node<V, A>) };
             if let Some(value) = node.value_mut() {
                 return Some((self.key.clone(), value));
             }
@@ -542,8 +564,8 @@ impl<'a, V: 'a> Iterator for IterMut<'a, V> {
 
 /// An iterator over a `PatriciaMap`'s keys.
 #[derive(Debug)]
-pub struct Keys<'a, V: 'a>(Iter<'a, V>);
-impl<'a, V: 'a> Iterator for Keys<'a, V> {
+pub struct Keys<'a, V: 'a, A: Clone + GlobalAlloc>(Iter<'a, V, A>);
+impl<'a, V: 'a, A: Clone + GlobalAlloc> Iterator for Keys<'a, V, A> {
     type Item = Vec<u8>;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(|(k, _)| k)
@@ -552,10 +574,10 @@ impl<'a, V: 'a> Iterator for Keys<'a, V> {
 
 /// An iterator over a `PatriciaMap`'s values.
 #[derive(Debug)]
-pub struct Values<'a, V: 'a> {
-    nodes: tree::Nodes<'a, V>,
+pub struct Values<'a, V: 'a, A: Clone + GlobalAlloc> {
+    nodes: tree::Nodes<'a, V, A>,
 }
-impl<'a, V: 'a> Iterator for Values<'a, V> {
+impl<'a, V: 'a, A: Clone + GlobalAlloc> Iterator for Values<'a, V, A> {
     type Item = &'a V;
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((_, node)) = self.nodes.next() {
@@ -569,15 +591,15 @@ impl<'a, V: 'a> Iterator for Values<'a, V> {
 
 /// A mutable iterator over a `PatriciaMap`'s values.
 #[derive(Debug)]
-pub struct ValuesMut<'a, V: 'a> {
-    nodes: tree::Nodes<'a, V>,
+pub struct ValuesMut<'a, V: 'a, A: Clone + GlobalAlloc> {
+    nodes: tree::Nodes<'a, V, A>,
 }
-impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
+impl<'a, V: 'a, A: Clone + GlobalAlloc> Iterator for ValuesMut<'a, V, A> {
     type Item = &'a mut V;
     #[allow(mutable_transmutes)]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((_, node)) = self.nodes.next() {
-            let node = unsafe { &mut *(node as *const _ as *mut Node<V>) };
+            let node = unsafe { &mut *(node as *const _ as *mut Node<V, A>) };
             if let Some(value) = node.value_mut() {
                 return Some(value);
             }
