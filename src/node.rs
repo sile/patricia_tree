@@ -1,6 +1,5 @@
 //! A node which represents a subtree of a patricia tree.
-use std::alloc::{handle_alloc_error, Layout};
-use std::alloc::{GlobalAlloc, System};
+use std::alloc::{handle_alloc_error, Layout, GlobalAlloc, System};
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
