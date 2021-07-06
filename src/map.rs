@@ -308,10 +308,7 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(map.get("bar"), Some(&12));
     /// ```
     pub fn iter_mut(&mut self) -> IterMut<V> {
-        IterMut {
-            nodes: self.tree.nodes(),
-            key: Vec::new(),
-        }
+        IterMut::new(self.tree.nodes_mut(), Vec::new())
     }
 
     /// Gets an iterator over the entries having the given prefix of this map, sorted by key.
@@ -337,6 +334,31 @@ impl<V> PatriciaMap<V> {
             .iter_prefix(prefix)
             .into_iter()
             .flat_map(move |(prefix_len, nodes)| Iter::new(nodes, Vec::from(&prefix[..prefix_len])))
+    }
+
+    /// Gets a mutable iterator over the entries having the given prefix of this map, sorted by key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map: PatriciaMap<_> =
+    ///     vec![("foo", 1), ("bar", 2), ("baz", 3)].into_iter().collect();
+    /// assert_eq!(vec![(Vec::from("bar"), &mut 2), ("baz".into(), &mut 3)],
+    ///            map.iter_prefix_mut(b"ba").collect::<Vec<_>>());
+    /// ```
+    pub fn iter_prefix_mut<'a, 'b>(
+        &'a mut self,
+        prefix: &'b [u8],
+    ) -> impl 'a + Iterator<Item = (Vec<u8>, &'a mut V)>
+        where
+            'b: 'a,
+    {
+        self.tree
+            .iter_prefix_mut(prefix)
+            .into_iter()
+            .flat_map(move |(prefix_len, nodes)| IterMut::new(nodes, Vec::from(&prefix[..prefix_len])))
     }
 
     /// Gets an iterator over the keys of this map, in sorted order.
@@ -520,19 +542,24 @@ impl<V> Iterator for IntoIter<V> {
 /// A mutable iterator over a `PatriciaMap`'s entries.
 #[derive(Debug)]
 pub struct IterMut<'a, V: 'a> {
-    nodes: tree::Nodes<'a, V>,
+    nodes: tree::NodesMut<'a, V>,
     key: Vec<u8>,
+}
+impl<'a, V: 'a> IterMut<'a, V> {
+    fn new(nodes: tree::NodesMut<'a, V>, key: Vec<u8>) -> Self {
+        Self {
+            nodes,
+            key,
+        }
+    }
 }
 impl<'a, V: 'a> Iterator for IterMut<'a, V> {
     type Item = (Vec<u8>, &'a mut V);
-    #[allow(mutable_transmutes)]
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((key_len, node)) = self.nodes.next() {
             self.key.truncate(key_len);
             self.key.extend(node.label());
-
-            let node = unsafe { &mut *(node as *const _ as *mut Node<V>) };
-            if let Some(value) = node.value_mut() {
+            if let Some(value) = node.take_value_mut() {
                 return Some((self.key.clone(), value));
             }
         }
@@ -646,6 +673,22 @@ mod tests {
         assert_eq!(
             map.into_iter().collect::<Vec<_>>(),
             [(Vec::from("bar"), 2), ("baz".into(), 3), ("foo".into(), 1)]
+        );
+    }
+
+    #[test]
+    fn iter_mut_works() {
+        let mut map: PatriciaMap<_> = vec![("foo", 1), ("bar", 2), ("baz", 3)]
+            .into_iter()
+            .collect();
+
+        for (_key, x) in map.iter_mut() {
+            (*x) *= 2;
+        }
+
+        assert_eq!(
+            map.into_iter().collect::<Vec<_>>(),
+            [(Vec::from("bar"), 4), ("baz".into(), 6), ("foo".into(), 2)]
         );
     }
 
