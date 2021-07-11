@@ -559,7 +559,7 @@ impl<'a, V: 'a> Iterator for IterMut<'a, V> {
         while let Some((key_len, node)) = self.nodes.next() {
             self.key.truncate(key_len);
             self.key.extend(node.label());
-            if let Some(value) = node.take_value_mut() {
+            if let Some(value) = node.into_value_mut() {
                 return Some((self.key.clone(), value));
             }
         }

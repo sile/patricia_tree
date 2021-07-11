@@ -1,4 +1,4 @@
-use crate::node::{self, Node, NodeMutRef};
+use crate::node::{self, Node, NodeMut};
 
 #[derive(Debug, Clone)]
 pub struct PatriciaTree<V> {
@@ -152,7 +152,7 @@ pub struct NodesMut<'a, V: 'a> {
     label_lens: Vec<usize>,
 }
 impl<'a, V: 'a> Iterator for NodesMut<'a, V> {
-    type Item = (usize, NodeMutRef<'a, V>);
+    type Item = (usize, NodeMut<'a, V>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, node)) = self.nodes.next() {
             self.label_lens.resize(level + 1, 0);

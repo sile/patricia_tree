@@ -286,7 +286,8 @@ impl<V> Node<V> {
         None
     }
 
-    pub(crate) fn proxy_mut(&mut self) -> NodeProxyMut<'_, V> {
+    /// Returns mutable references to the node itself with its sibling and child
+    pub fn as_mut(&mut self) -> NodeMut<'_, V> {
         let mut sibling_result = None;
         let mut child_result = None;
         let mut value_result = None;
@@ -318,7 +319,7 @@ impl<V> Node<V> {
             }
         }
 
-        NodeProxyMut {
+        NodeMut {
             label: self.label(),
             sibling: sibling_result,
             child: child_result,
@@ -876,41 +877,68 @@ pub struct IterMut<'a, V: 'a> {
 
 /// A reference to an immediate node (without child or sibling) with its
 /// label and a mutable reference to its value, if present.
-pub struct NodeMutRef<'a, V: 'a> {
+pub struct NodeMut<'a, V: 'a> {
     label: &'a [u8],
     value: Option<&'a mut V>,
+    sibling: Option<&'a mut Node<V>>,
+    child: Option<&'a mut Node<V>>,
 }
-impl<'a, V: 'a> NodeMutRef<'a, V> {
+impl<'a, V: 'a> NodeMut<'a, V> {
     /// Makes a new reference to a node's label and mutable value.
-    pub fn new(label: &'a [u8], value: Option<&'a mut V>) -> Self {
-        NodeMutRef { label, value }
+    pub fn new(
+        label: &'a [u8],
+        value: Option<&'a mut V>,
+        sibling: Option<&'a mut Node<V>>,
+        child: Option<&'a mut Node<V>>,
+    ) -> Self {
+        NodeMut {
+            label,
+            value,
+            sibling,
+            child,
+        }
     }
 
-    /// Returns the label of the referenced node.
+    /// Returns the label of the node.
     pub fn label(&self) -> &'a [u8] {
         self.label
     }
 
-    /// Returns the optional reference to the value stored within the referenced node.
-    pub fn take_value_mut(self) -> Option<&'a mut V> {
+    /// Returns the value of the node, if present.
+    pub fn value(&self) -> &Option<&'a mut V> {
+        &self.value
+    }
+
+    /// Returns the sibling of the node, if present.
+    pub fn sibling(&self) -> &Option<&'a mut Node<V>> {
+        &self.sibling
+    }
+
+    /// Returns the child of the node, if present.
+    pub fn child(&self) -> &Option<&'a mut Node<V>> {
+        &self.child
+    }
+
+    /// Converts into a mutable reference to the value.
+    pub fn into_value_mut(self) -> Option<&'a mut V> {
         self.value
     }
 }
 
 impl<'a, V: 'a> Iterator for IterMut<'a, V> {
-    type Item = (usize, NodeMutRef<'a, V>);
+    type Item = (usize, NodeMut<'a, V>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, node)) = self.stack.pop() {
-            let proxy = node.proxy_mut();
+            let mut node = node.as_mut();
             if level != 0 {
-                if let Some(sibling) = proxy.sibling {
+                if let Some(sibling) = node.sibling.take() {
                     self.stack.push((level, sibling));
                 }
             }
-            if let Some(child) = proxy.child {
+            if let Some(child) = node.child.take() {
                 self.stack.push((level + 1, child));
             }
-            Some((level, NodeMutRef::new(proxy.label, proxy.value)))
+            Some((level, node))
         } else {
             None
         }
@@ -973,13 +1001,6 @@ impl<V> Iterator for IntoIter<V> {
             None
         }
     }
-}
-
-pub(crate) struct NodeProxyMut<'a, V> {
-    label: &'a [u8],
-    sibling: Option<&'a mut Node<V>>,
-    child: Option<&'a mut Node<V>>,
-    value: Option<&'a mut V>,
 }
 
 #[cfg(test)]
