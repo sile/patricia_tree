@@ -323,7 +323,7 @@ impl<V> Node<V> {
             label: self.label(),
             sibling: sibling_result,
             child: child_result,
-            value: value_result
+            value: value_result,
         }
     }
 
@@ -564,7 +564,11 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn get_prefix_node_mut(&mut self, key: &[u8], offset: usize) -> Option<(usize, &mut Self)> {
+    pub(crate) fn get_prefix_node_mut(
+        &mut self,
+        key: &[u8],
+        offset: usize,
+    ) -> Option<(usize, &mut Self)> {
         let common_prefix_len = self.skip_common_prefix(key);
         let next = &key[common_prefix_len..];
         if next.is_empty() {

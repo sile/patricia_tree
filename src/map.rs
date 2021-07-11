@@ -352,13 +352,15 @@ impl<V> PatriciaMap<V> {
         &'a mut self,
         prefix: &'b [u8],
     ) -> impl 'a + Iterator<Item = (Vec<u8>, &'a mut V)>
-        where
-            'b: 'a,
+    where
+        'b: 'a,
     {
         self.tree
             .iter_prefix_mut(prefix)
             .into_iter()
-            .flat_map(move |(prefix_len, nodes)| IterMut::new(nodes, Vec::from(&prefix[..prefix_len])))
+            .flat_map(move |(prefix_len, nodes)| {
+                IterMut::new(nodes, Vec::from(&prefix[..prefix_len]))
+            })
     }
 
     /// Gets an iterator over the keys of this map, in sorted order.
@@ -547,10 +549,7 @@ pub struct IterMut<'a, V: 'a> {
 }
 impl<'a, V: 'a> IterMut<'a, V> {
     fn new(nodes: tree::NodesMut<'a, V>, key: Vec<u8>) -> Self {
-        Self {
-            nodes,
-            key,
-        }
+        Self { nodes, key }
     }
 }
 impl<'a, V: 'a> Iterator for IterMut<'a, V> {
