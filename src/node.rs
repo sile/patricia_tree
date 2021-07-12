@@ -286,6 +286,47 @@ impl<V> Node<V> {
         None
     }
 
+    /// Returns mutable references to the node itself with its sibling and child
+    pub fn as_mut(&mut self) -> NodeMut<'_, V> {
+        let mut sibling_result = None;
+        let mut child_result = None;
+        let mut value_result = None;
+
+        if let Some(offset) = self.child_offset() {
+            if self.flags().contains(Flags::CHILD_INITIALIZED) {
+                unsafe {
+                    let child = self.ptr.offset(offset) as *mut Self;
+                    child_result.replace(&mut *child);
+                }
+            }
+        }
+
+        if let Some(offset) = self.sibling_offset() {
+            if self.flags().contains(Flags::SIBLING_INITIALIZED) {
+                unsafe {
+                    let sibling = self.ptr.offset(offset) as *mut Self;
+                    sibling_result.replace(&mut *sibling);
+                }
+            }
+        }
+
+        if let Some(offset) = self.value_offset() {
+            if self.flags().contains(Flags::VALUE_INITIALIZED) {
+                unsafe {
+                    let value = self.ptr.offset(offset) as *mut V;
+                    value_result.replace(&mut *value);
+                }
+            }
+        }
+
+        NodeMut {
+            label: self.label(),
+            sibling: sibling_result,
+            child: child_result,
+            value: value_result,
+        }
+    }
+
     /// Takes the value out of this node.
     pub fn take_value(&mut self) -> Option<V> {
         if let Some(offset) = self.value_offset() {
@@ -400,8 +441,44 @@ impl<V> Node<V> {
         }
     }
 
+    /// Gets a mutable iterator which traverses the nodes in this tree, in depth first order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::node::Node;
+    ///
+    /// let mut set = PatriciaSet::new();
+    /// set.insert("foo");
+    /// set.insert("bar");
+    /// set.insert("baz");
+    ///
+    /// let mut node = Node::from(set);
+    /// let nodes = node.iter_mut().map(|(level, node)| (level, node.label())).collect::<Vec<_>>();
+    /// assert_eq!(nodes,
+    ///            [
+    ///                (0, "".as_ref()),
+    ///                (1, "ba".as_ref()),
+    ///                (2, "r".as_ref()),
+    ///                (2, "z".as_ref()),
+    ///                (1, "foo".as_ref())
+    ///            ]);
+    /// ```
+    pub fn iter_mut(&mut self) -> IterMut<V> {
+        IterMut {
+            stack: vec![(0, self)],
+        }
+    }
+
     pub(crate) fn iter_descendant(&self) -> Iter<V> {
         Iter {
+            stack: vec![(0, self)],
+        }
+    }
+
+    pub(crate) fn iter_descendant_mut(&mut self) -> IterMut<V> {
+        IterMut {
             stack: vec![(0, self)],
         }
     }
@@ -482,6 +559,27 @@ impl<V> Node<V> {
         } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
             self.sibling()
                 .and_then(|sibling| sibling.get_prefix_node(next, offset))
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn get_prefix_node_mut(
+        &mut self,
+        key: &[u8],
+        offset: usize,
+    ) -> Option<(usize, &mut Self)> {
+        let common_prefix_len = self.skip_common_prefix(key);
+        let next = &key[common_prefix_len..];
+        if next.is_empty() {
+            Some((common_prefix_len, self))
+        } else if common_prefix_len == self.label().len() {
+            let offset = offset + common_prefix_len;
+            self.child_mut()
+                .and_then(|child| child.get_prefix_node_mut(next, offset))
+        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+            self.sibling_mut()
+                .and_then(|sibling| sibling.get_prefix_node_mut(next, offset))
         } else {
             None
         }
@@ -764,6 +862,84 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
                 }
             }
             if let Some(child) = node.child() {
+                self.stack.push((level + 1, child));
+            }
+            Some((level, node))
+        } else {
+            None
+        }
+    }
+}
+
+/// A mutable iterator which traverses the nodes in a tree, in depth first order.
+///
+/// The first element of an item is the level of the traversing node.
+#[derive(Debug)]
+pub struct IterMut<'a, V: 'a> {
+    stack: Vec<(usize, &'a mut Node<V>)>,
+}
+
+/// A reference to an immediate node (without child or sibling) with its
+/// label and a mutable reference to its value, if present.
+pub struct NodeMut<'a, V: 'a> {
+    label: &'a [u8],
+    value: Option<&'a mut V>,
+    sibling: Option<&'a mut Node<V>>,
+    child: Option<&'a mut Node<V>>,
+}
+impl<'a, V: 'a> NodeMut<'a, V> {
+    /// Makes a new reference to a node's label and mutable value.
+    pub fn new(
+        label: &'a [u8],
+        value: Option<&'a mut V>,
+        sibling: Option<&'a mut Node<V>>,
+        child: Option<&'a mut Node<V>>,
+    ) -> Self {
+        NodeMut {
+            label,
+            value,
+            sibling,
+            child,
+        }
+    }
+
+    /// Returns the label of the node.
+    pub fn label(&self) -> &'a [u8] {
+        self.label
+    }
+
+    /// Returns the value of the node, if present.
+    pub fn value(&self) -> &Option<&'a mut V> {
+        &self.value
+    }
+
+    /// Returns the sibling of the node, if present.
+    pub fn sibling(&self) -> &Option<&'a mut Node<V>> {
+        &self.sibling
+    }
+
+    /// Returns the child of the node, if present.
+    pub fn child(&self) -> &Option<&'a mut Node<V>> {
+        &self.child
+    }
+
+    /// Converts into a mutable reference to the value.
+    pub fn into_value_mut(self) -> Option<&'a mut V> {
+        self.value
+    }
+}
+
+impl<'a, V: 'a> Iterator for IterMut<'a, V> {
+    type Item = (usize, NodeMut<'a, V>);
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((level, node)) = self.stack.pop() {
+            let mut node = node.as_mut();
+            if level != 0 {
+                if let Some(sibling) = node.sibling.take() {
+                    self.stack.push((level, sibling));
+                }
+            }
+            if let Some(child) = node.child.take() {
                 self.stack.push((level + 1, child));
             }
             Some((level, node))

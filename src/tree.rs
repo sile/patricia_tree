@@ -1,4 +1,4 @@
-use crate::node::{self, Node};
+use crate::node::{self, Node, NodeMut};
 
 #[derive(Debug, Clone)]
 pub struct PatriciaTree<V> {
@@ -49,6 +49,17 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
+    pub fn iter_prefix_mut<'a, 'b>(&'a mut self, prefix: &'b [u8]) -> Option<(usize, NodesMut<V>)> {
+        if let Some((common_prefix_len, node)) = self.root.get_prefix_node_mut(prefix, 0) {
+            let nodes = NodesMut {
+                nodes: node.iter_descendant_mut(),
+                label_lens: Vec::new(),
+            };
+            Some((prefix.len() - common_prefix_len, nodes))
+        } else {
+            None
+        }
+    }
     pub(crate) fn common_prefixes<K>(&self, key: K) -> node::CommonPrefixesIter<K, V>
     where
         K: AsRef<[u8]>,
@@ -88,6 +99,12 @@ impl<V> PatriciaTree<V> {
             label_lens: Vec::new(),
         }
     }
+    pub fn nodes_mut(&mut self) -> NodesMut<V> {
+        NodesMut {
+            nodes: self.root.iter_mut(),
+            label_lens: Vec::new(),
+        }
+    }
     pub fn into_nodes(self) -> IntoNodes<V> {
         IntoNodes {
             nodes: self.root.into_iter(),
@@ -116,6 +133,26 @@ pub struct Nodes<'a, V: 'a> {
 }
 impl<'a, V: 'a> Iterator for Nodes<'a, V> {
     type Item = (usize, &'a Node<V>);
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((level, node)) = self.nodes.next() {
+            self.label_lens.resize(level + 1, 0);
+            self.label_lens[level] = node.label().len();
+
+            let parent_key_len = self.label_lens.iter().take(level).sum();
+            Some((parent_key_len, node))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct NodesMut<'a, V: 'a> {
+    nodes: node::IterMut<'a, V>,
+    label_lens: Vec<usize>,
+}
+impl<'a, V: 'a> Iterator for NodesMut<'a, V> {
+    type Item = (usize, NodeMut<'a, V>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, node)) = self.nodes.next() {
             self.label_lens.resize(level + 1, 0);
