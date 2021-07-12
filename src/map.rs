@@ -510,7 +510,7 @@ impl<'a, V: 'a> Iter<'a, V> {
 impl<'a, V: 'a> Iterator for Iter<'a, V> {
     type Item = (Vec<u8>, &'a V);
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((key_len, node)) = self.nodes.next() {
+        for (key_len, node) in &mut self.nodes {
             self.key.truncate(self.key_offset + key_len);
             self.key.extend(node.label());
             if let Some(value) = node.value() {
@@ -530,7 +530,7 @@ pub struct IntoIter<V> {
 impl<V> Iterator for IntoIter<V> {
     type Item = (Vec<u8>, V);
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((key_len, mut node)) = self.nodes.next() {
+        for (key_len, mut node) in &mut self.nodes {
             self.key.truncate(key_len);
             self.key.extend(node.label());
             if let Some(value) = node.take_value() {
@@ -555,7 +555,7 @@ impl<'a, V: 'a> IterMut<'a, V> {
 impl<'a, V: 'a> Iterator for IterMut<'a, V> {
     type Item = (Vec<u8>, &'a mut V);
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((key_len, node)) = self.nodes.next() {
+        for (key_len, node) in &mut self.nodes {
             self.key.truncate(key_len);
             self.key.extend(node.label());
             if let Some(value) = node.into_value_mut() {
@@ -584,7 +584,7 @@ pub struct Values<'a, V: 'a> {
 impl<'a, V: 'a> Iterator for Values<'a, V> {
     type Item = &'a V;
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((_, node)) = self.nodes.next() {
+        for (_, node) in &mut self.nodes {
             if let Some(value) = node.value() {
                 return Some(value);
             }
@@ -602,7 +602,7 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
     type Item = &'a mut V;
     #[allow(mutable_transmutes)]
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((_, node)) = self.nodes.next() {
+        for (_, node) in &mut self.nodes {
             let node = unsafe { &mut *(node as *const _ as *mut Node<V>) };
             if let Some(value) = node.value_mut() {
                 return Some(value);
