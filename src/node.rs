@@ -691,12 +691,70 @@ impl<V> Node<V> {
         }
     }
 
+    pub(crate) fn insert_with_unit<U: crate::Unit>(&mut self, key: &[u8], value: V) -> Option<V> {
+        if self.label().get(0) > key.get(0) {
+            let this = Node {
+                ptr: self.ptr,
+                _value: PhantomData,
+            };
+            let node = Node::new(key, Some(value), None, Some(this));
+            self.ptr = node.ptr;
+            mem::forget(node);
+            return None;
+        }
+
+        let common_prefix_len = self.skip_common_prefix_with_unit::<U>(key);
+        let next = &key[common_prefix_len..];
+        let is_label_matched = common_prefix_len == self.label().len();
+        if next.is_empty() {
+            if is_label_matched {
+                let old = self.take_value();
+                self.set_value(value);
+                old
+            } else {
+                self.split_at(common_prefix_len);
+                self.set_value(value);
+                None
+            }
+        } else if is_label_matched {
+            if let Some(child) = self.child_mut() {
+                return child.insert_with_unit::<U>(next, value);
+            }
+            let child = Node::new(next, Some(value), None, None);
+            self.set_child(child);
+            None
+        } else if common_prefix_len == 0 {
+            if let Some(sibling) = self.sibling_mut() {
+                return sibling.insert_with_unit::<U>(next, value);
+            }
+            let sibling = Node::new(next, Some(value), None, None);
+            self.set_sibling(sibling);
+            None
+        } else {
+            self.split_at(common_prefix_len);
+            assert_some!(self.child_mut()).insert_with_unit::<U>(next, value);
+            None
+        }
+    }
+
     fn skip_common_prefix(&self, key: &[u8]) -> usize {
         self.label()
             .iter()
             .zip(key.iter())
             .take_while(|x| x.0 == x.1)
             .count()
+    }
+    fn skip_common_prefix_with_unit<U: crate::Unit>(&self, key: &[u8]) -> usize {
+        let mut last_boundary = 0;
+        for (i, (x, y)) in self.label().iter().zip(key.iter()).enumerate() {
+            if U::is_unit_boundary(key, i) {
+                last_boundary = i;
+            };
+            if x != y {
+                return last_boundary;
+            }
+        }
+        last_boundary
     }
     pub(crate) fn flags(&self) -> Flags {
         Flags::from_bits_truncate(unsafe { *self.ptr })
