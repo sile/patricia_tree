@@ -1,5 +1,5 @@
 //! A map based on a patricia tree.
-use crate::node::Node;
+use crate::node::{self, Node};
 use crate::tree::{self, PatriciaTree};
 use std::fmt;
 use std::iter::FromIterator;
@@ -177,16 +177,14 @@ impl<V> PatriciaMap<V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefixes<'a, 'b>(
-        &'a self,
-        key: &'b [u8],
-    ) -> impl 'b + Iterator<Item = (&'b [u8], &'a V)>
+    pub fn common_prefixes<'a, 'b>(&'a self, key: &'b [u8]) -> CommonPrefixesIter<'a, 'b, V>
     where
         'a: 'b,
     {
-        self.tree
-            .common_prefixes(key)
-            .filter_map(move |(prefix_len, n)| n.value().map(|v| (&key[..prefix_len], v)))
+        CommonPrefixesIter {
+            key,
+            iterator: self.tree.common_prefixes(key),
+        }
     }
 
     /// Returns an iterator that collects all values of entries in the map up to a certain key.
@@ -608,6 +606,27 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
                 return Some(value);
             }
         }
+        None
+    }
+}
+
+/// An iterator over entries in a `PatriciaMap` that share a common prefix with
+/// a given key.
+#[derive(Debug)]
+pub struct CommonPrefixesIter<'a, 'b, V> {
+    key: &'b [u8],
+    iterator: node::CommonPrefixesIter<'a, &'b [u8], V>,
+}
+impl<'a, 'b, V> Iterator for CommonPrefixesIter<'a, 'b, V> {
+    type Item = (&'b [u8], &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for (prefix_len, n) in self.iterator.by_ref() {
+            if let Some(v) = n.value() {
+                return Some((&self.key[..prefix_len], v));
+            }
+        }
+
         None
     }
 }
