@@ -502,7 +502,7 @@ impl<V> Node<V> {
             } else {
                 self.child().and_then(|child| child.get(next))
             }
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
             self.sibling().and_then(|sibling| sibling.get(next))
         } else {
             None
@@ -517,7 +517,7 @@ impl<V> Node<V> {
             } else {
                 self.child_mut().and_then(|child| child.get_mut(next))
             }
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
             self.sibling_mut().and_then(|sibling| sibling.get_mut(next))
         } else {
             None
@@ -539,7 +539,7 @@ impl<V> Node<V> {
                     .and_then(|child| child.get_longest_common_prefix(next, offset))
                     .or_else(|| self.value().map(|v| (offset, v)))
             }
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
             self.sibling()
                 .and_then(|sibling| sibling.get_longest_common_prefix(next, offset))
         } else {
@@ -556,7 +556,7 @@ impl<V> Node<V> {
             let offset = offset + common_prefix_len;
             self.child()
                 .and_then(|child| child.get_prefix_node(next, offset))
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
             self.sibling()
                 .and_then(|sibling| sibling.get_prefix_node(next, offset))
         } else {
@@ -577,7 +577,7 @@ impl<V> Node<V> {
             let offset = offset + common_prefix_len;
             self.child_mut()
                 .and_then(|child| child.get_prefix_node_mut(next, offset))
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
             self.sibling_mut()
                 .and_then(|sibling| sibling.get_prefix_node_mut(next, offset))
         } else {
@@ -604,7 +604,7 @@ impl<V> Node<V> {
                     self.try_merge_with_child();
                     old
                 })
-        } else if common_prefix_len == 0 && self.label().get(0) <= prefix.get(0) {
+        } else if common_prefix_len == 0 && self.label().first() <= prefix.first() {
             let next = &prefix[common_prefix_len..];
             self.sibling_mut()
                 .and_then(|sibling| sibling.split_by_prefix(next))
@@ -634,7 +634,7 @@ impl<V> Node<V> {
                         old
                     })
             }
-        } else if common_prefix_len == 0 && self.label().get(0) <= key.get(0) {
+        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
             self.sibling_mut()
                 .and_then(|sibling| sibling.remove(next))
                 .map(|old| {
@@ -646,7 +646,7 @@ impl<V> Node<V> {
         }
     }
     pub(crate) fn insert(&mut self, key: &[u8], value: V) -> Option<V> {
-        if self.label().get(0) > key.get(0) {
+        if self.label().first() > key.first() {
             let this = Node {
                 ptr: self.ptr,
                 _value: PhantomData,
@@ -965,7 +965,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((offset, node)) = self.stack.pop() {
             let common_prefix_len = node.skip_common_prefix(&self.key.as_ref()[offset..]);
-            if common_prefix_len == 0 && node.label().get(0) <= self.key.as_ref().get(offset) {
+            if common_prefix_len == 0 && node.label().first() <= self.key.as_ref().get(offset) {
                 if let Some(sibling) = node.sibling() {
                     self.stack.push((offset, sibling));
                 }
