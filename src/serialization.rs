@@ -1,7 +1,8 @@
 use crate::node::{Flags, Node};
 use crate::{PatriciaMap, PatriciaSet};
-use serde::de::Error;
+use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::borrow::{Borrow, Cow};
 
 impl Serialize for PatriciaSet {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -26,17 +27,6 @@ impl<T: Serialize> Serialize for Node<T> {
     where
         S: Serializer,
     {
-        struct Bytes<'a>(&'a [u8]);
-
-        impl<'a> Serialize for Bytes<'a> {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: Serializer,
-            {
-                serializer.serialize_bytes(self.0)
-            }
-        }
-
         let mut tree_bytes = Vec::new();
         let mut values = Vec::new();
         let mut stack = vec![(0u16, self)];
@@ -57,7 +47,7 @@ impl<T: Serialize> Serialize for Node<T> {
             }
         }
 
-        (Bytes(&tree_bytes), values).serialize(serializer)
+        (Bytes(Cow::Owned(tree_bytes)), values).serialize(serializer)
     }
 }
 
@@ -86,9 +76,11 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Node<T> {
     {
         // let (mut tree_bytes, mut values): (&'de [u8], Vec<T>) =
         //     Deserialize::deserialize(deserializer)?;
-        let (tree_bytes, mut values): (Vec<u8>, Vec<T>) = Deserialize::deserialize(deserializer)?;
+        //let (tree_bytes, mut values): (Vec<u8>, Vec<T>) = Deserialize::deserialize(deserializer)?;
+        let (tree_bytes, mut values): (Bytes<'de>, Vec<T>) =
+            Deserialize::deserialize(deserializer)?;
         values.reverse();
-        let mut tree_bytes = &tree_bytes[..];
+        let mut tree_bytes = tree_bytes.0.as_ref();
 
         let mut stack = Vec::new();
         while !tree_bytes.is_empty() {
@@ -146,6 +138,50 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Node<T> {
     }
 }
 
+struct Bytes<'a>(Cow<'a, [u8]>);
+
+impl<'a> Serialize for Bytes<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_bytes(self.0.borrow())
+    }
+}
+
+impl<'de> Deserialize<'de> for Bytes<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_bytes(BytesVisitor)
+    }
+}
+
+struct BytesVisitor;
+
+impl<'de> Visitor<'de> for BytesVisitor {
+    type Value = Bytes<'de>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "a byte string")
+    }
+
+    fn visit_borrowed_bytes<E>(self, v: &'de [u8]) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(Bytes(Cow::Borrowed(v)))
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(Bytes(Cow::Owned(v.to_owned())))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::PatriciaMap;
@@ -160,37 +196,25 @@ mod tests {
         input.sort();
 
         let map: PatriciaMap<u32> = input.iter().cloned().collect();
-
-        let mut bytes = Vec::new();
-        ciborium::ser::into_writer(&map, &mut bytes).unwrap();
-
-        let map: PatriciaMap<u32> = ciborium::de::from_reader(&mut &bytes[..]).unwrap();
+        let bytes = postcard::to_allocvec(&map).unwrap();
+        let map: PatriciaMap<u32> = postcard::from_bytes(&bytes).unwrap();
 
         assert_eq!(map.len(), 3);
         assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
     }
 
-    // #[test]
-    // fn large_serde_works() {
-    //     let mut input = (0..10000)
-    //         .map(|i| (i.to_string().into_bytes(), i))
-    //         .collect::<Vec<_>>();
-    //     input.sort();
+    #[test]
+    fn large_serde_works() {
+        let mut input = (0..10000u32)
+            .map(|i| (i.to_string().into_bytes(), i))
+            .collect::<Vec<_>>();
+        input.sort();
 
-    //     let map: PatriciaMap<_> = input.iter().cloned().collect();
-    //     let root = Node::from(map);
+        let map: PatriciaMap<u32> = input.iter().cloned().collect();
+        let bytes = postcard::to_allocvec(&map).unwrap();
+        let map: PatriciaMap<u32> = postcard::from_bytes(&bytes).unwrap();
 
-    //     let mut buf = Vec::new();
-    //     let mut encoder = track_try_unwrap!(NodeEncoder::<U32beEncoder>::with_item(root));
-    //     track_try_unwrap!(encoder.encode_all(&mut buf));
-
-    //     let mut decoder = NodeDecoder::new(U32beDecoder::new());
-    //     let size = track_try_unwrap!(decoder.decode(&buf, Eos::new(true)));
-    //     assert_eq!(size, buf.len());
-
-    //     let item = track_try_unwrap!(decoder.finish_decoding());
-    //     let map = PatriciaMap::from(item);
-    //     assert_eq!(map.len(), 10000);
-    //     assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
-    // }
+        assert_eq!(map.len(), 10000);
+        assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
+    }
 }

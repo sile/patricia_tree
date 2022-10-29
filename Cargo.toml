@@ -24,8 +24,8 @@ trackable = { version = "1", optional = true }
 serde = { version = "1", optional = true }
 
 [dev-dependencies]
-ciborium = "0.2"
 clap = { version = "4", features = ["derive"] }
+postcard = { version = "1", features = ["use-std"] }
 rand = "0.8"
 
 [package.metadata.docs.rs]
