@@ -1,6 +1,6 @@
 [package]
 name = "patricia_tree"
-version = "0.3.2"
+version = "0.4.0"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
 description = "Memory-efficient data structures based on patricia tree"
 homepage = "https://github.com/sile/patricia_tree"
@@ -12,7 +12,7 @@ license = "MIT"
 edition = "2021"
 
 [badges]
-coveralls = {repository = "sile/patricia_tree"}
+coveralls = { repository = "sile/patricia_tree" }
 
 [features]
 binary-format = ["bytecodec", "trackable"]
