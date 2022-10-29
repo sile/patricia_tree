@@ -1,24 +1,22 @@
-extern crate clap;
-extern crate patricia_tree;
-
-use clap::{App, Arg};
+use clap::Parser;
 use patricia_tree::PatriciaSet;
 use std::collections::{BTreeSet, HashSet};
 use std::io::BufRead;
 
-fn main() {
-    let matches = App::new("insert_lines")
-        .version(env!("CARGO_PKG_VERSION"))
-        .arg(
-            Arg::with_name("KIND")
-                .long("kind")
-                .takes_value(true)
-                .possible_values(&["patricia", "hash", "btree", "count"])
-                .default_value("patricia"),
-        )
-        .get_matches();
+#[derive(Parser)]
+struct Args {
+    #[clap(
+        long,
+        default_value = "patricia",
+        value_parser = clap::builder::PossibleValuesParser::new(["patricia", "hash", "btree", "count"])
+    )]
+    kind: String,
+}
 
-    match matches.value_of("KIND").unwrap() {
+fn main() {
+    let args = Args::parse();
+
+    match args.kind.as_str() {
         "patricia" => {
             let mut set = PatriciaSet::new();
             each_line(|line| {

@@ -20,10 +20,10 @@ binary-format = ["bytecodec", "trackable"]
 [dependencies]
 bitflags = "1"
 bytecodec = { version = "0.4", optional = true }
-trackable = { version = "0.2", optional = true }
+trackable = { version = "1", optional = true }
 
 [dev-dependencies]
-clap = "2"
+clap = { version = "4", features = ["derive"] }
 rand = "0.8"
 
 [package.metadata.docs.rs]
