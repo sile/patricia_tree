@@ -21,8 +21,10 @@ binary-format = ["bytecodec", "trackable"]
 bitflags = "1"
 bytecodec = { version = "0.4", optional = true }
 trackable = { version = "1", optional = true }
+serde = { version = "1", optional = true }
 
 [dev-dependencies]
+ciborium = "0.2"
 clap = { version = "4", features = ["derive"] }
 rand = "0.8"
 

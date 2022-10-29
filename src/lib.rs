@@ -45,4 +45,6 @@ pub mod set;
 
 #[cfg(feature = "binary-format")]
 mod codec;
+#[cfg(feature = "serde")]
+mod serialization;
 mod tree;
