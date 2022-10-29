@@ -21,9 +21,11 @@ binary-format = ["bytecodec", "trackable"]
 bitflags = "1"
 bytecodec = { version = "0.4", optional = true }
 trackable = { version = "1", optional = true }
+serde = { version = "1", optional = true }
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }
+postcard = { version = "1", features = ["use-std"] }
 rand = "0.8"
 
 [package.metadata.docs.rs]
