@@ -143,7 +143,7 @@ impl<V> PatriciaMap<V> {
     }
 
     /// As with [`PatriciaMap::insert()`] except for that this method regards UTF-8 character boundaries of the input key.
-
+    ///
     /// # Examples
     ///
     /// ```
