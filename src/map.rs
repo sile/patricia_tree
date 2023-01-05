@@ -144,7 +144,7 @@ impl<V> PatriciaMap<V> {
 
     #[allow(missing_docs)]
     pub fn insert_str(&mut self, key: &str, value: V) -> Option<V> {
-        self.tree.insert_with_unit::<_, crate::Char>(key, value)
+        self.tree.insert_str(key, value)
     }
 
     /// Removes a key from this map, returning the value at the key if the key was previously in it.

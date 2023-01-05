@@ -48,26 +48,3 @@ mod codec;
 #[cfg(feature = "serde")]
 mod serialization;
 mod tree;
-
-#[allow(missing_docs)]
-pub trait Unit {
-    fn is_unit_boundary(key: &[u8], i: usize) -> bool;
-}
-
-#[allow(missing_docs)]
-pub struct Byte;
-
-impl Unit for Byte {
-    fn is_unit_boundary(_: &[u8], _: usize) -> bool {
-        true
-    }
-}
-
-#[allow(missing_docs)]
-pub struct Char;
-
-impl Unit for Char {
-    fn is_unit_boundary(key: &[u8], i: usize) -> bool {
-        std::str::from_utf8(key).map_or(false, |s| s.is_char_boundary(i))
-    }
-}

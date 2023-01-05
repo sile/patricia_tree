@@ -691,19 +691,19 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn insert_with_unit<U: crate::Unit>(&mut self, key: &[u8], value: V) -> Option<V> {
-        if self.label().get(0) > key.get(0) {
+    pub(crate) fn insert_str(&mut self, key: &str, value: V) -> Option<V> {
+        if self.label().get(0) > key.as_bytes().get(0) {
             let this = Node {
                 ptr: self.ptr,
                 _value: PhantomData,
             };
-            let node = Node::new(key, Some(value), None, Some(this));
+            let node = Node::new(key.as_bytes(), Some(value), None, Some(this));
             self.ptr = node.ptr;
             mem::forget(node);
             return None;
         }
 
-        let common_prefix_len = self.skip_common_prefix_with_unit::<U>(key);
+        let common_prefix_len = self.skip_str_common_prefix(key);
         let next = &key[common_prefix_len..];
         let is_label_matched = common_prefix_len == self.label().len();
         if next.is_empty() {
@@ -718,21 +718,21 @@ impl<V> Node<V> {
             }
         } else if is_label_matched {
             if let Some(child) = self.child_mut() {
-                return child.insert_with_unit::<U>(next, value);
+                return child.insert_str(next, value);
             }
-            let child = Node::new(next, Some(value), None, None);
+            let child = Node::new(next.as_bytes(), Some(value), None, None);
             self.set_child(child);
             None
         } else if common_prefix_len == 0 {
             if let Some(sibling) = self.sibling_mut() {
-                return sibling.insert_with_unit::<U>(next, value);
+                return sibling.insert_str(next, value);
             }
-            let sibling = Node::new(next, Some(value), None, None);
+            let sibling = Node::new(next.as_bytes(), Some(value), None, None);
             self.set_sibling(sibling);
             None
         } else {
             self.split_at(common_prefix_len);
-            assert_some!(self.child_mut()).insert_with_unit::<U>(next, value);
+            assert_some!(self.child_mut()).insert_str(next, value);
             None
         }
     }
@@ -744,17 +744,17 @@ impl<V> Node<V> {
             .take_while(|x| x.0 == x.1)
             .count()
     }
-    fn skip_common_prefix_with_unit<U: crate::Unit>(&self, key: &[u8]) -> usize {
-        let mut last_boundary = 0;
-        for (i, (x, y)) in self.label().iter().zip(key.iter()).enumerate() {
-            if U::is_unit_boundary(key, i) {
-                last_boundary = i;
-            };
-            if x != y {
-                return last_boundary;
+    fn skip_str_common_prefix(&self, key: &str) -> usize {
+        for (i, c) in key.char_indices() {
+            let n = c.len_utf8();
+            if key.as_bytes()[i..i + n]
+                .iter()
+                .ne(self.label()[i..].iter().take(n))
+            {
+                return i;
             }
         }
-        last_boundary
+        key.len()
     }
     pub(crate) fn flags(&self) -> Flags {
         Flags::from_bits_truncate(unsafe { *self.ptr })

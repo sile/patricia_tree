@@ -27,12 +27,8 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
-    pub fn insert_with_unit<K: AsRef<[u8]>, U: crate::Unit>(
-        &mut self,
-        key: K,
-        value: V,
-    ) -> Option<V> {
-        if let Some(old) = self.root.insert_with_unit::<U>(key.as_ref(), value) {
+    pub fn insert_str(&mut self, key: &str, value: V) -> Option<V> {
+        if let Some(old) = self.root.insert_str(key, value) {
             Some(old)
         } else {
             self.len += 1;
