@@ -27,6 +27,14 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
+    pub fn insert_str(&mut self, key: &str, value: V) -> Option<V> {
+        if let Some(old) = self.root.insert_str(key, value) {
+            Some(old)
+        } else {
+            self.len += 1;
+            None
+        }
+    }
     pub fn get<K: AsRef<[u8]>>(&self, key: K) -> Option<&V> {
         self.root.get(key.as_ref())
     }

@@ -139,6 +139,37 @@ impl PatriciaSet {
         self.map.insert(value, ()).is_none()
     }
 
+    /// As with [`PatriciaSet::insert()`] except for that this method regards UTF-8 character boundaries of the input value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaSet;
+    ///
+    /// // Insert values as opaque byte strings.
+    /// //
+    /// // Node labels can be arbitrary byte strings.
+    /// let mut set = PatriciaSet::new();
+    /// set.insert("🌏🗻"); // [240, 159, 140, 143, 240, 159, 151, 187]
+    /// set.insert("🌏🍔"); // [240, 159, 140, 143, 240, 159, 141, 148]
+    ///
+    /// let first_label = set.as_ref().child().unwrap().label();
+    /// assert_eq!(first_label, [240, 159, 140, 143, 240, 159]);
+    ///
+    /// // Insert values as UTF-8 strings.
+    /// //
+    /// // Node labels are guaranteed to be UTF-8 byte strings.
+    /// let mut set = PatriciaSet::new();
+    /// set.insert_str("🌏🗻");
+    /// set.insert_str("🌏🍔");
+    ///
+    /// let first_label = set.as_ref().child().unwrap().label();
+    /// assert_eq!(first_label, "🌏".as_bytes());
+    /// ```
+    pub fn insert_str(&mut self, value: &str) -> bool {
+        self.map.insert_str(value, ()).is_none()
+    }
+
     /// Removes a value from the set. Returns `true` is the value was present in this set.
     ///
     /// # Examples

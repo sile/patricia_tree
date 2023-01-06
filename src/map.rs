@@ -142,6 +142,37 @@ impl<V> PatriciaMap<V> {
         self.tree.insert(key, value)
     }
 
+    /// As with [`PatriciaMap::insert()`] except for that this method regards UTF-8 character boundaries of the input key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// // Insert keys as opaque byte strings.
+    /// //
+    /// // Node labels can be arbitrary byte strings.
+    /// let mut map = PatriciaMap::new();
+    /// map.insert("🌏🗻", ()); // [240, 159, 140, 143, 240, 159, 151, 187]
+    /// map.insert("🌏🍔", ()); // [240, 159, 140, 143, 240, 159, 141, 148]
+    ///
+    /// let first_label = map.as_ref().child().unwrap().label();
+    /// assert_eq!(first_label, [240, 159, 140, 143, 240, 159]);
+    ///
+    /// // Insert keys as UTF-8 strings.
+    /// //
+    /// // Node labels are guaranteed to be UTF-8 byte strings.
+    /// let mut map = PatriciaMap::new();
+    /// map.insert_str("🌏🗻", ());
+    /// map.insert_str("🌏🍔", ());
+    ///
+    /// let first_label = map.as_ref().child().unwrap().label();
+    /// assert_eq!(first_label, "🌏".as_bytes());
+    /// ```
+    pub fn insert_str(&mut self, key: &str, value: V) -> Option<V> {
+        self.tree.insert_str(key, value)
+    }
+
     /// Removes a key from this map, returning the value at the key if the key was previously in it.
     ///
     /// # Examples
@@ -844,5 +875,25 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert!(vec![0 as u16, 1, 2].into_iter().eq(results.into_iter()));
+    }
+
+    #[test]
+    fn utf8_keys_works() {
+        // Insert as bytes.
+        let mut t = PatriciaMap::new();
+        t.insert("🌏🗻", ()); // [240,159,140,143,240,159,151,187]
+        t.insert("🌏🍔", ()); // [240,159,140,143,240,159,141,148]
+
+        let first_label = t.as_ref().child().unwrap().label();
+        assert!(std::str::from_utf8(first_label).is_err());
+        assert_eq!(first_label, [240, 159, 140, 143, 240, 159]);
+
+        // Insert as string.
+        let mut t = PatriciaMap::new();
+        t.insert_str("🌏🗻", ());
+        t.insert_str("🌏🍔", ());
+
+        let first_label = t.as_ref().child().unwrap().label();
+        assert_eq!(std::str::from_utf8(first_label).ok(), Some("🌏"));
     }
 }
