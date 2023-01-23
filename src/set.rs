@@ -402,9 +402,12 @@ mod tests {
         assert_eq!(splitted_set.iter().collect::<Vec<_>>(), [b"bar"]);
 
         let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
-        let splitted_set = set.split_by_prefix("baz");
+        let mut splitted_set = set.split_by_prefix("baz");
         assert_eq!(set.iter().collect::<Vec<_>>(), [b"bar", b"foo"]);
         assert_eq!(splitted_set.iter().collect::<Vec<_>>(), [b"baz"]);
+
+        splitted_set.insert("aaa");
+        assert_eq!(splitted_set.iter().collect::<Vec<_>>(), [b"aaa", b"baz"]);
 
         let mut set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
         let splitted_set = set.split_by_prefix("bazz");
