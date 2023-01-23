@@ -75,7 +75,7 @@ impl<V> PatriciaTree<V> {
         self.root.common_prefixes(key)
     }
     pub fn remove<K: AsRef<[u8]>>(&mut self, key: K) -> Option<V> {
-        if let Some(old) = self.root.remove(key.as_ref()) {
+        if let Some(old) = self.root.remove(key.as_ref(), 0) {
             self.len -= 1;
             Some(old)
         } else {
@@ -83,10 +83,8 @@ impl<V> PatriciaTree<V> {
         }
     }
     pub fn split_by_prefix<K: AsRef<[u8]>>(&mut self, prefix: K) -> Self {
-        if let Some(splitted_root) = self.root.split_by_prefix(prefix.as_ref()) {
-            let mut splitted_root = Node::new(prefix.as_ref(), None, Some(splitted_root), None);
-            splitted_root.try_merge_with_child();
-
+        if let Some(splitted_root) = self.root.split_by_prefix(prefix.as_ref(), 0) {
+            let splitted_root = Node::new(prefix.as_ref(), None, Some(splitted_root), None);
             let splitted = Self::from(splitted_root);
             self.len -= splitted.len();
             splitted

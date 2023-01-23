@@ -896,4 +896,15 @@ mod tests {
         let first_label = t.as_ref().child().unwrap().label();
         assert_eq!(std::str::from_utf8(first_label).ok(), Some("🌏"));
     }
+
+    #[test]
+    fn issue21() {
+        let mut map = PatriciaMap::new();
+        map.insert("1", 0);
+        map.insert("2", 0);
+        map.remove("2");
+        map.insert("2", 0);
+        assert_eq!(map.len(), map.iter().count());
+        assert_eq!(map.len(), map.iter_mut().count());
+    }
 }

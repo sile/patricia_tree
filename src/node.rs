@@ -585,7 +585,7 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn split_by_prefix(&mut self, prefix: &[u8]) -> Option<Self> {
+    pub(crate) fn split_by_prefix(&mut self, prefix: &[u8], level: usize) -> Option<Self> {
         let common_prefix_len = self.skip_common_prefix(prefix);
         if common_prefix_len == prefix.len() {
             let value = self.take_value();
@@ -598,16 +598,16 @@ impl<V> Node<V> {
         } else if common_prefix_len == self.label().len() {
             let next = &prefix[common_prefix_len..];
             self.child_mut()
-                .and_then(|child| child.split_by_prefix(next))
+                .and_then(|child| child.split_by_prefix(next, level + 1))
                 .map(|old| {
                     self.try_reclaim_child();
-                    self.try_merge_with_child();
+                    self.try_merge_with_child(level);
                     old
                 })
         } else if common_prefix_len == 0 && self.label().first() <= prefix.first() {
             let next = &prefix[common_prefix_len..];
             self.sibling_mut()
-                .and_then(|sibling| sibling.split_by_prefix(next))
+                .and_then(|sibling| sibling.split_by_prefix(next, level))
                 .map(|old| {
                     self.try_reclaim_sibling();
                     old
@@ -616,27 +616,27 @@ impl<V> Node<V> {
             None
         }
     }
-    pub(crate) fn remove(&mut self, key: &[u8]) -> Option<V> {
+    pub(crate) fn remove(&mut self, key: &[u8], level: usize) -> Option<V> {
         let common_prefix_len = self.skip_common_prefix(key);
         let next = &key[common_prefix_len..];
         if common_prefix_len == self.label().len() {
             if next.is_empty() {
                 self.take_value().map(|old| {
-                    self.try_merge_with_child();
+                    self.try_merge_with_child(level);
                     old
                 })
             } else {
                 self.child_mut()
-                    .and_then(|child| child.remove(next))
+                    .and_then(|child| child.remove(next, level + 1))
                     .map(|old| {
                         self.try_reclaim_child();
-                        self.try_merge_with_child();
+                        self.try_merge_with_child(level);
                         old
                     })
             }
         } else if common_prefix_len == 0 && self.label().first() <= key.first() {
             self.sibling_mut()
-                .and_then(|sibling| sibling.remove(next))
+                .and_then(|sibling| sibling.remove(next, level))
                 .map(|old| {
                     self.try_reclaim_sibling();
                     old
@@ -834,7 +834,11 @@ impl<V> Node<V> {
             self.set_child(child);
         }
     }
-    pub(crate) fn try_merge_with_child(&mut self) {
+    pub(crate) fn try_merge_with_child(&mut self, level: usize) {
+        if level == 0 {
+            return;
+        }
+
         if self.flags().contains(Flags::VALUE_INITIALIZED)
             || !self.flags().contains(Flags::CHILD_INITIALIZED)
         {
@@ -1094,13 +1098,16 @@ mod tests {
         );
 
         set.remove("123def");
-        assert_eq!(set_to_labels(&set), [(0, "123"), (1, "456"), (1, "abc")]);
+        assert_eq!(
+            set_to_labels(&set),
+            [(0, ""), (1, "123"), (2, "456"), (2, "abc")]
+        );
 
         set.remove("123456");
-        assert_eq!(set_to_labels(&set), [(0, "123"), (1, "abc")]);
+        assert_eq!(set_to_labels(&set), [(0, ""), (1, "123"), (2, "abc")]);
 
         set.remove("123");
-        assert_eq!(set_to_labels(&set), [(0, "123abc")]);
+        assert_eq!(set_to_labels(&set), [(0, ""), (1, "123abc")]);
     }
 
     #[test]
