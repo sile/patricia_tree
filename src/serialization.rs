@@ -5,6 +5,16 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::{Borrow, Cow};
 
 impl Serialize for PatriciaSet {
+    /// In order to serialize a [PatriciaSet], make sure you installed the crate
+    /// with the feature `serde`.
+    ///
+    /// For example, in your `Cargo.toml`:
+    /// ```toml
+    /// [dependencies]
+    /// patricia_tree = { version = "0.5.5", features = ["serde"] }
+    /// ```
+    ///
+    /// Read more about serialization / deserialization at the [serde] crate.
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -14,6 +24,16 @@ impl Serialize for PatriciaSet {
 }
 
 impl<T: Serialize> Serialize for PatriciaMap<T> {
+    /// In order to serialize a [PatriciaMap], make sure you installed the crate
+    /// with the feature `serde`.
+    ///
+    /// For example, in your `Cargo.toml`:
+    /// ```toml
+    /// [dependencies]
+    /// patricia_tree = { version = "0.5.5", features = ["serde"] }
+    /// ```
+    ///
+    /// Read more about serialization / deserialization at the [serde] crate.
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -52,6 +72,16 @@ impl<T: Serialize> Serialize for Node<T> {
 }
 
 impl<'de> Deserialize<'de> for PatriciaSet {
+    /// In order to deserialize a [PatriciaSet], make sure you installed the crate
+    /// with the feature `serde`.
+    ///
+    /// For example, in your `Cargo.toml`:
+    /// ```toml
+    /// [dependencies]
+    /// patricia_tree = { version = "0.5.5", features = ["serde"] }
+    /// ```
+    ///
+    /// Read more about serialization / deserialization at the [serde] crate.
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -61,6 +91,16 @@ impl<'de> Deserialize<'de> for PatriciaSet {
 }
 
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for PatriciaMap<T> {
+    /// In order to serialize a [PatriciaMap], make sure you installed the crate
+    /// with the feature `serde`.
+    ///
+    /// For example, in your `Cargo.toml`:
+    /// ```toml
+    /// [dependencies]
+    /// patricia_tree = { version = "0.5.5", features = ["serde"] }
+    /// ```
+    ///
+    /// Read more about serialization / deserialization at the [serde] crate.
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
