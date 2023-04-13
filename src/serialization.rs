@@ -217,6 +217,17 @@ impl<'de> Visitor<'de> for BytesVisitor {
     {
         Ok(Bytes(Cow::Owned(v.to_owned())))
     }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
+        let mut bytes = Vec::new();
+        while let Some(byte) = seq.next_element()? {
+            bytes.push(byte);
+        }
+        Ok(Bytes(Cow::Owned(bytes)))
+    }
 }
 
 #[cfg(test)]
