@@ -217,6 +217,17 @@ impl<'de> Visitor<'de> for BytesVisitor {
     {
         Ok(Bytes(Cow::Owned(v.to_owned())))
     }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
+        let mut bytes = Vec::new();
+        while let Some(byte) = seq.next_element()? {
+            bytes.push(byte);
+        }
+        Ok(Bytes(Cow::Owned(bytes)))
+    }
 }
 
 #[cfg(test)]
@@ -235,6 +246,23 @@ mod tests {
         let map: PatriciaMap<u32> = input.iter().cloned().collect();
         let bytes = postcard::to_allocvec(&map).unwrap();
         let map: PatriciaMap<u32> = postcard::from_bytes(&bytes).unwrap();
+
+        assert_eq!(map.len(), 3);
+        assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
+    }
+
+    #[test]
+    fn serde_json_works() {
+        let mut input = vec![
+            (Vec::from("foo"), 1u32),
+            ("bar".into(), 2),
+            ("baz".into(), 3),
+        ];
+        input.sort();
+
+        let map: PatriciaMap<u32> = input.iter().cloned().collect();
+        let json = serde_json::to_string(&map).unwrap();
+        let map: PatriciaMap<u32> = serde_json::from_str(&json).unwrap();
 
         assert_eq!(map.len(), 3);
         assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
