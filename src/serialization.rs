@@ -114,9 +114,6 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Node<T> {
     where
         D: Deserializer<'de>,
     {
-        // let (mut tree_bytes, mut values): (&'de [u8], Vec<T>) =
-        //     Deserialize::deserialize(deserializer)?;
-        //let (tree_bytes, mut values): (Vec<u8>, Vec<T>) = Deserialize::deserialize(deserializer)?;
         let (tree_bytes, mut values): (Bytes<'de>, Vec<T>) =
             Deserialize::deserialize(deserializer)?;
         values.reverse();
