@@ -30,6 +30,7 @@ bitflags! {
 
 #[cfg(feature = "binary-format")]
 pub use crate::codec::{NodeDecoder, NodeEncoder};
+use crate::Key;
 
 const FLAGS_OFFSET: isize = 0;
 const LABEL_LEN_OFFSET: isize = 1;
@@ -42,7 +43,7 @@ const MAX_LABEL_LEN: usize = 255;
 /// Note that this is a low level building block.
 /// Usually it is recommended to use more high level data structures (e.g., `PatriciaTree`).
 #[derive(Debug)]
-pub struct Node<V> {
+pub struct Node<K, V> {
     // layout:
     //   - flags: u8
     //   - label_len: u8
@@ -52,11 +53,12 @@ pub struct Node<V> {
     //   - sibling: Option<Node<V>>
     ptr: *mut u8,
 
+    _key: PhantomData<K>,
     _value: PhantomData<V>,
 }
-unsafe impl<V: Send> Send for Node<V> {}
-unsafe impl<V: Sync> Sync for Node<V> {}
-impl<V> Node<V> {
+unsafe impl<K, V: Send> Send for Node<K, V> {}
+unsafe impl<K, V: Sync> Sync for Node<K, V> {}
+impl<K, V> Node<K, V> {
     /// Makes a new node which represents an empty tree.
     ///
     /// # Examples
@@ -157,6 +159,7 @@ impl<V> Node<V> {
             }
             Node {
                 ptr,
+                _key: PhantomData,
                 _value: PhantomData,
             }
         }
@@ -287,7 +290,7 @@ impl<V> Node<V> {
     }
 
     /// Returns mutable references to the node itself with its sibling and child
-    pub fn as_mut(&mut self) -> NodeMut<'_, V> {
+    pub fn as_mut(&mut self) -> NodeMut<'_, K, V> {
         let mut sibling_result = None;
         let mut child_result = None;
         let mut value_result = None;
@@ -435,7 +438,7 @@ impl<V> Node<V> {
     ///                (1, "foo".as_ref())
     ///            ]);
     /// ```
-    pub fn iter(&self) -> Iter<V> {
+    pub fn iter(&self) -> Iter<K, V> {
         Iter {
             stack: vec![(0, self)],
         }
@@ -465,27 +468,29 @@ impl<V> Node<V> {
     ///                (1, "foo".as_ref())
     ///            ]);
     /// ```
-    pub fn iter_mut(&mut self) -> IterMut<V> {
+    pub fn iter_mut(&mut self) -> IterMut<K, V> {
         IterMut {
             stack: vec![(0, self)],
         }
     }
 
-    pub(crate) fn iter_descendant(&self) -> Iter<V> {
+    // TODO: remove in favor of iter()
+    pub(crate) fn iter_descendant(&self) -> Iter<K, V> {
         Iter {
             stack: vec![(0, self)],
         }
     }
 
-    pub(crate) fn iter_descendant_mut(&mut self) -> IterMut<V> {
+    // TODO: remove in favor of iter_mut()
+    pub(crate) fn iter_descendant_mut(&mut self) -> IterMut<K, V> {
         IterMut {
             stack: vec![(0, self)],
         }
     }
 
-    pub(crate) fn common_prefixes<K>(&self, key: K) -> CommonPrefixesIter<K, V>
+    pub(crate) fn common_prefixes<Q>(&self, key: Q) -> CommonPrefixesIter<K, Q, V>
     where
-        K: AsRef<[u8]>,
+        Q: AsRef<K>,
     {
         CommonPrefixesIter {
             key,
@@ -649,6 +654,7 @@ impl<V> Node<V> {
         if self.label().first() > key.first() {
             let this = Node {
                 ptr: self.ptr,
+                _key: PhantomData::<K>,
                 _value: PhantomData,
             };
             let node = Node::new(key, Some(value), None, Some(this));
@@ -691,51 +697,53 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn insert_str(&mut self, key: &str, value: V) -> Option<V> {
-        if self.label().get(0) > key.as_bytes().get(0) {
-            let this = Node {
-                ptr: self.ptr,
-                _value: PhantomData,
-            };
-            let node = Node::new(key.as_bytes(), Some(value), None, Some(this));
-            self.ptr = node.ptr;
-            mem::forget(node);
-            return None;
-        }
+    // TODO
+    // pub(crate) fn insert_str(&mut self, key: &str, value: V) -> Option<V> {
+    //     if self.label().get(0) > key.as_bytes().get(0) {
+    //         let this = Node {
+    //             ptr: self.ptr,
 
-        let common_prefix_len = self.skip_str_common_prefix(key);
-        let next = &key[common_prefix_len..];
-        let is_label_matched = common_prefix_len == self.label().len();
-        if next.is_empty() {
-            if is_label_matched {
-                let old = self.take_value();
-                self.set_value(value);
-                old
-            } else {
-                self.split_at(common_prefix_len);
-                self.set_value(value);
-                None
-            }
-        } else if is_label_matched {
-            if let Some(child) = self.child_mut() {
-                return child.insert_str(next, value);
-            }
-            let child = Node::new(next.as_bytes(), Some(value), None, None);
-            self.set_child(child);
-            None
-        } else if common_prefix_len == 0 {
-            if let Some(sibling) = self.sibling_mut() {
-                return sibling.insert_str(next, value);
-            }
-            let sibling = Node::new(next.as_bytes(), Some(value), None, None);
-            self.set_sibling(sibling);
-            None
-        } else {
-            self.split_at(common_prefix_len);
-            assert_some!(self.child_mut()).insert_str(next, value);
-            None
-        }
-    }
+    //             _value: PhantomData,
+    //         };
+    //         let node = Node::new(key.as_bytes(), Some(value), None, Some(this));
+    //         self.ptr = node.ptr;
+    //         mem::forget(node);
+    //         return None;
+    //     }
+
+    //     let common_prefix_len = self.skip_str_common_prefix(key);
+    //     let next = &key[common_prefix_len..];
+    //     let is_label_matched = common_prefix_len == self.label().len();
+    //     if next.is_empty() {
+    //         if is_label_matched {
+    //             let old = self.take_value();
+    //             self.set_value(value);
+    //             old
+    //         } else {
+    //             self.split_at(common_prefix_len);
+    //             self.set_value(value);
+    //             None
+    //         }
+    //     } else if is_label_matched {
+    //         if let Some(child) = self.child_mut() {
+    //             return child.insert_str(next, value);
+    //         }
+    //         let child = Node::new(next.as_bytes(), Some(value), None, None);
+    //         self.set_child(child);
+    //         None
+    //     } else if common_prefix_len == 0 {
+    //         if let Some(sibling) = self.sibling_mut() {
+    //             return sibling.insert_str(next, value);
+    //         }
+    //         let sibling = Node::new(next.as_bytes(), Some(value), None, None);
+    //         self.set_sibling(sibling);
+    //         None
+    //     } else {
+    //         self.split_at(common_prefix_len);
+    //         assert_some!(self.child_mut()).insert_str(next, value);
+    //         None
+    //     }
+    // }
 
     fn skip_common_prefix(&self, key: &[u8]) -> usize {
         self.label()
@@ -868,7 +876,7 @@ impl<V> Node<V> {
     }
 }
 
-impl<V> Drop for Node<V> {
+impl<K, V> Drop for Node<K, V> {
     fn drop(&mut self) {
         let _ = self.take_value();
         let _ = self.take_child();
@@ -888,7 +896,7 @@ impl<V> Drop for Node<V> {
         unsafe { dealloc(self.ptr, layout.pad_to_align()) }
     }
 }
-impl<V: Clone> Clone for Node<V> {
+impl<K, V: Clone> Clone for Node<K, V> {
     fn clone(&self) -> Self {
         let label = self.label();
         let value = self.value().cloned();
@@ -897,9 +905,9 @@ impl<V: Clone> Clone for Node<V> {
         Node::new(label, value, child, sibling)
     }
 }
-impl<V> IntoIterator for Node<V> {
-    type Item = (usize, Node<V>);
-    type IntoIter = IntoIter<V>;
+impl<K: Key, V> IntoIterator for Node<K, V> {
+    type Item = (usize, Node<K, V>);
+    type IntoIter = IntoIter<K, V>;
     fn into_iter(self) -> Self::IntoIter {
         IntoIter {
             stack: vec![(0, self)],
@@ -911,11 +919,11 @@ impl<V> IntoIterator for Node<V> {
 ///
 /// The first element of an item is the level of the traversing node.
 #[derive(Debug)]
-pub struct Iter<'a, V: 'a> {
-    stack: Vec<(usize, &'a Node<V>)>,
+pub struct Iter<'a, K, V: 'a> {
+    stack: Vec<(usize, &'a Node<K, V>)>,
 }
-impl<'a, V: 'a> Iterator for Iter<'a, V> {
-    type Item = (usize, &'a Node<V>);
+impl<'a, K: Key, V: 'a> Iterator for Iter<'a, K, V> {
+    type Item = (usize, &'a Node<K, V>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, node)) = self.stack.pop() {
             if level != 0 {
@@ -937,25 +945,25 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
 ///
 /// The first element of an item is the level of the traversing node.
 #[derive(Debug)]
-pub struct IterMut<'a, V: 'a> {
-    stack: Vec<(usize, &'a mut Node<V>)>,
+pub struct IterMut<'a, K, V: 'a> {
+    stack: Vec<(usize, &'a mut Node<K, V>)>,
 }
 
 /// A reference to an immediate node (without child or sibling) with its
 /// label and a mutable reference to its value, if present.
-pub struct NodeMut<'a, V: 'a> {
+pub struct NodeMut<'a, K, V: 'a> {
     label: &'a [u8],
     value: Option<&'a mut V>,
-    sibling: Option<&'a mut Node<V>>,
-    child: Option<&'a mut Node<V>>,
+    sibling: Option<&'a mut Node<K, V>>,
+    child: Option<&'a mut Node<K, V>>,
 }
-impl<'a, V: 'a> NodeMut<'a, V> {
+impl<'a, K: Key, V: 'a> NodeMut<'a, K, V> {
     /// Makes a new reference to a node's label and mutable value.
     pub fn new(
         label: &'a [u8],
         value: Option<&'a mut V>,
-        sibling: Option<&'a mut Node<V>>,
-        child: Option<&'a mut Node<V>>,
+        sibling: Option<&'a mut Node<K, V>>,
+        child: Option<&'a mut Node<K, V>>,
     ) -> Self {
         NodeMut {
             label,
@@ -976,12 +984,12 @@ impl<'a, V: 'a> NodeMut<'a, V> {
     }
 
     /// Returns the sibling of the node, if present.
-    pub fn sibling(&self) -> &Option<&'a mut Node<V>> {
+    pub fn sibling(&self) -> &Option<&'a mut Node<K, V>> {
         &self.sibling
     }
 
     /// Returns the child of the node, if present.
-    pub fn child(&self) -> &Option<&'a mut Node<V>> {
+    pub fn child(&self) -> &Option<&'a mut Node<K, V>> {
         &self.child
     }
 
@@ -991,8 +999,8 @@ impl<'a, V: 'a> NodeMut<'a, V> {
     }
 }
 
-impl<'a, V: 'a> Iterator for IterMut<'a, V> {
-    type Item = (usize, NodeMut<'a, V>);
+impl<'a, K: Key, V: 'a> Iterator for IterMut<'a, K, V> {
+    type Item = (usize, NodeMut<'a, K, V>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, node)) = self.stack.pop() {
             let mut node = node.as_mut();
@@ -1014,20 +1022,23 @@ impl<'a, V: 'a> Iterator for IterMut<'a, V> {
 /// An iterator over entries in that collects all values up to
 /// until the key stops matching.
 #[derive(Debug)]
-pub(crate) struct CommonPrefixesIter<'a, K, V> {
-    key: K,
-    stack: Vec<(usize, &'a Node<V>)>,
+pub(crate) struct CommonPrefixesIter<'a, K, Q, V> {
+    key: Q,
+    stack: Vec<(usize, &'a Node<K, V>)>,
 }
 
-impl<'a, K, V> Iterator for CommonPrefixesIter<'a, K, V>
+impl<'a, K, Q, V> Iterator for CommonPrefixesIter<'a, K, Q, V>
 where
-    K: AsRef<[u8]>,
+    K: Key,
+    Q: AsRef<K>,
 {
-    type Item = (usize, &'a Node<V>);
+    type Item = (usize, &'a Node<K, V>);
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((offset, node)) = self.stack.pop() {
-            let common_prefix_len = node.skip_common_prefix(&self.key.as_ref()[offset..]);
-            if common_prefix_len == 0 && node.label().first() <= self.key.as_ref().get(offset) {
+            let common_prefix_len = node.skip_common_prefix(&self.key.as_ref().as_ref()[offset..]);
+            if common_prefix_len == 0
+                && node.label().first() <= self.key.as_ref().as_ref().get(offset)
+            {
                 if let Some(sibling) = node.sibling() {
                     self.stack.push((offset, sibling));
                 }
@@ -1049,11 +1060,11 @@ where
 ///
 /// The first element of an item is the level of the traversing node.
 #[derive(Debug)]
-pub struct IntoIter<V> {
-    stack: Vec<(usize, Node<V>)>,
+pub struct IntoIter<K, V> {
+    stack: Vec<(usize, Node<K, V>)>,
 }
-impl<V> Iterator for IntoIter<V> {
-    type Item = (usize, Node<V>);
+impl<K: Key, V> Iterator for IntoIter<K, V> {
+    type Item = (usize, Node<K, V>);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((level, mut node)) = self.stack.pop() {
             if let Some(sibling) = node.take_sibling() {
