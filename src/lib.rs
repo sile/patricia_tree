@@ -41,9 +41,9 @@ mod node;
 mod serialization;
 mod tree;
 
-/// TODO
+/// This trait represents a bytes type that can be used as the key type of patricia trees.
 pub trait Bytes {
-    /// TODO
+    /// Borrowed type of this type.
     type Borrowed: ?Sized + BorrowedBytes + ToOwned<Owned = Self>;
 }
 
@@ -55,18 +55,20 @@ impl Bytes for String {
     type Borrowed = str;
 }
 
-/// TODO
+/// Borrowed type of [`Bytes`].
 pub trait BorrowedBytes {
-    /// TODO
+    /// Returns the byte representation of this instance.
     fn as_bytes(&self) -> &[u8];
 
-    /// TODO
+    /// Returns `true` if the given bytes is a valid representation of this type, otherwise `false`.
     fn is_valid_bytes(bytes: &[u8]) -> bool;
 
-    /// TODO
+    /// Converts the given bytes to an instance of this type.
+    ///
+    /// Caller can assume that `is_valid_bytes(bytes)` is `true`.
     fn from_bytes(bytes: &[u8]) -> &Self;
 
-    /// TODO
+    /// Returns a suffix of this instance not containing the common prefix with the given bytes.
     fn strip_common_prefix(&self, bytes: &[u8]) -> &Self;
 }
 

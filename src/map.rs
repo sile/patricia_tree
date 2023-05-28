@@ -6,13 +6,13 @@ use std::fmt;
 use std::iter::FromIterator;
 use std::marker::PhantomData;
 
-/// TODO
+/// Patricia tree based map with [`Vec<u8>`] as key.
 pub type PatriciaMap<V> = GenericPatriciaMap<Vec<u8>, V>;
 
-/// TODO
+/// Patricia tree based map with [`String`] as key.
 pub type StringPatriciaMap<V> = GenericPatriciaMap<String, V>;
 
-/// A map based on a patricia tree.
+/// Patricia tree based map.
 pub struct GenericPatriciaMap<K, V> {
     tree: PatriciaTree<V>,
     _key: PhantomData<K>,

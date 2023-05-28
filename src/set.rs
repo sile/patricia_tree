@@ -6,18 +6,16 @@ use crate::Bytes;
 use std::fmt;
 use std::iter::FromIterator;
 
-/// TODO
+/// Patricia tree based set with [`Vec<u8>`] as key.
 pub type PatriciaSet = GenericPatriciaSet<Vec<u8>>;
 
-/// TODO
+/// Patricia tree based set with [`String`] as key.
 pub type StringPatriciaSet = GenericPatriciaSet<String>;
 
-/// A set based on a patricia tree.
-#[derive(Default, Clone)]
+/// Patricia tree based set.
 pub struct GenericPatriciaSet<T> {
     map: GenericPatriciaMap<T, ()>,
 }
-
 impl<T> GenericPatriciaSet<T> {
     /// Makes a new empty [`GenericPatriciaSet`] instance.
     ///
@@ -257,6 +255,18 @@ impl<T: Bytes + fmt::Debug> fmt::Debug for GenericPatriciaSet<T> {
         }
         write!(f, "}}")?;
         Ok(())
+    }
+}
+impl<T> Clone for GenericPatriciaSet<T> {
+    fn clone(&self) -> Self {
+        GenericPatriciaSet {
+            map: self.map.clone(),
+        }
+    }
+}
+impl<T> Default for GenericPatriciaSet<T> {
+    fn default() -> Self {
+        GenericPatriciaSet::new()
     }
 }
 impl<T: Bytes> IntoIterator for GenericPatriciaSet<T> {
