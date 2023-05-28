@@ -40,3 +40,53 @@ mod node;
 #[cfg(feature = "serde")]
 mod serialization;
 mod tree;
+
+/// TODO
+pub trait Bytes {
+    /// TODO
+    type Owned;
+
+    /// TODO
+    fn as_bytes(&self) -> &[u8];
+
+    /// TODO
+    fn is_valid_bytes(bytes: &[u8]) -> bool;
+
+    /// TODO
+    fn from_bytes(bytes: &[u8]) -> &Self;
+
+    /// TODO
+    fn from_owned_bytes(bytes: Vec<u8>) -> Self::Owned;
+
+    /// TODO
+    fn strip_common_prefix<'a, 'b>(&'a self, bytes: &'b [u8]) -> (&'a Self, &'b [u8]);
+}
+
+impl Bytes for [u8] {
+    type Owned = Vec<u8>;
+
+    fn as_bytes(&self) -> &[u8] {
+        self
+    }
+
+    fn is_valid_bytes(_bytes: &[u8]) -> bool {
+        true
+    }
+
+    fn from_bytes(bytes: &[u8]) -> &Self {
+        bytes
+    }
+
+    fn from_owned_bytes(bytes: Vec<u8>) -> Self::Owned {
+        bytes
+    }
+
+    fn strip_common_prefix<'a, 'b>(&'a self, bytes: &'b [u8]) -> (&'a Self, &'b [u8]) {
+        let i = self
+            .iter()
+            .zip(bytes.iter())
+            .take_while(|(a, b)| a == b)
+            .count();
+        (&self[..i], &bytes[i..])
+    }
+}
