@@ -1,4 +1,5 @@
 //! A node which represents a subtree of a patricia tree.
+use crate::Bytes;
 use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
 use std::marker::PhantomData;
 use std::mem;
@@ -556,22 +557,22 @@ impl<V> Node<V> {
             None
         }
     }
-    pub(crate) fn insert(&mut self, key: &[u8], value: V) -> Option<V> {
-        if self.label().first() > key.first() {
+    pub(crate) fn insert<K: ?Sized + Bytes>(&mut self, key: &K, value: V) -> Option<V> {
+        if self.label().first() > key.as_bytes().first() {
             let this = Node {
                 ptr: self.ptr,
                 _value: PhantomData,
             };
-            let node = Node::new(key, Some(value), None, Some(this));
+            let node = Node::new(key.as_bytes(), Some(value), None, Some(this));
             self.ptr = node.ptr;
             mem::forget(node);
             return None;
         }
 
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
+        let next = key.strip_common_prefix(self.label());
+        let common_prefix_len = key.as_bytes().len() - next.as_bytes().len();
         let is_label_matched = common_prefix_len == self.label().len();
-        if next.is_empty() {
+        if next.as_bytes().is_empty() {
             if is_label_matched {
                 let old = self.take_value();
                 self.set_value(value);
@@ -585,14 +586,14 @@ impl<V> Node<V> {
             if let Some(child) = self.child_mut() {
                 return child.insert(next, value);
             }
-            let child = Node::new(next, Some(value), None, None);
+            let child = Node::new(next.as_bytes(), Some(value), None, None);
             self.set_child(child);
             None
         } else if common_prefix_len == 0 {
             if let Some(sibling) = self.sibling_mut() {
                 return sibling.insert(next, value);
             }
-            let sibling = Node::new(next, Some(value), None, None);
+            let sibling = Node::new(next.as_bytes(), Some(value), None, None);
             self.set_sibling(sibling);
             None
         } else {
@@ -601,71 +602,12 @@ impl<V> Node<V> {
             None
         }
     }
-
-    pub(crate) fn insert_str(&mut self, key: &str, value: V) -> Option<V> {
-        if self.label().get(0) > key.as_bytes().get(0) {
-            let this = Node {
-                ptr: self.ptr,
-                _value: PhantomData,
-            };
-            let node = Node::new(key.as_bytes(), Some(value), None, Some(this));
-            self.ptr = node.ptr;
-            mem::forget(node);
-            return None;
-        }
-
-        let common_prefix_len = self.skip_str_common_prefix(key);
-        let next = &key[common_prefix_len..];
-        let is_label_matched = common_prefix_len == self.label().len();
-        if next.is_empty() {
-            if is_label_matched {
-                let old = self.take_value();
-                self.set_value(value);
-                old
-            } else {
-                self.split_at(common_prefix_len);
-                self.set_value(value);
-                None
-            }
-        } else if is_label_matched {
-            if let Some(child) = self.child_mut() {
-                return child.insert_str(next, value);
-            }
-            let child = Node::new(next.as_bytes(), Some(value), None, None);
-            self.set_child(child);
-            None
-        } else if common_prefix_len == 0 {
-            if let Some(sibling) = self.sibling_mut() {
-                return sibling.insert_str(next, value);
-            }
-            let sibling = Node::new(next.as_bytes(), Some(value), None, None);
-            self.set_sibling(sibling);
-            None
-        } else {
-            self.split_at(common_prefix_len);
-            assert_some!(self.child_mut()).insert_str(next, value);
-            None
-        }
-    }
-
     fn skip_common_prefix(&self, key: &[u8]) -> usize {
         self.label()
             .iter()
             .zip(key.iter())
             .take_while(|x| x.0 == x.1)
             .count()
-    }
-    fn skip_str_common_prefix(&self, key: &str) -> usize {
-        for (i, c) in key.char_indices() {
-            let n = c.len_utf8();
-            if key.as_bytes()[i..i + n]
-                .iter()
-                .ne(self.label()[i..].iter().take(n))
-            {
-                return i;
-            }
-        }
-        key.len()
     }
     pub(crate) fn flags(&self) -> Flags {
         Flags::from_bits_truncate(unsafe { *self.ptr })
@@ -953,7 +895,7 @@ impl<V> Iterator for IntoIter<V> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::PatriciaSet;
+    use crate::BytesPatriciaSet;
     use std::str;
 
     #[test]
@@ -992,9 +934,7 @@ mod tests {
 
     #[test]
     fn ietr_works() {
-        use crate::PatriciaSet;
-
-        let mut set = PatriciaSet::new();
+        let mut set = BytesPatriciaSet::new();
         set.insert("foo");
         set.insert("bar");
         set.insert("baz");
@@ -1018,9 +958,7 @@ mod tests {
 
     #[test]
     fn iter_mut_works() {
-        use crate::PatriciaSet;
-
-        let mut set = PatriciaSet::new();
+        let mut set = BytesPatriciaSet::new();
         set.insert("foo");
         set.insert("bar");
         set.insert("baz");
@@ -1058,7 +996,7 @@ mod tests {
     fn reclaim_works() {
         let mut set = ["123", "123456", "123abc", "123def"]
             .iter()
-            .collect::<PatriciaSet>();
+            .collect::<BytesPatriciaSet>();
         assert_eq!(
             set_to_labels(&set),
             [(0, ""), (1, "123"), (2, "456"), (2, "abc"), (2, "def")]
@@ -1081,7 +1019,7 @@ mod tests {
     fn get_longest_common_prefix_works() {
         let set = ["123", "123456", "1234_67", "123abc", "123def"]
             .iter()
-            .collect::<PatriciaSet>();
+            .collect::<BytesPatriciaSet>();
 
         let lcp = |key| set.get_longest_common_prefix(key);
         assert_eq!(lcp(""), None);
@@ -1093,7 +1031,7 @@ mod tests {
         assert_eq!(lcp("123456789"), Some("123456".as_bytes()));
     }
 
-    fn set_to_labels(set: &PatriciaSet) -> Vec<(usize, &str)> {
+    fn set_to_labels(set: &BytesPatriciaSet) -> Vec<(usize, &str)> {
         set.as_node()
             .iter()
             .map(|(level, n)| (level, str::from_utf8(n.label()).unwrap()))

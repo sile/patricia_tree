@@ -4,7 +4,7 @@ use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::{Borrow, Cow};
 
-impl Serialize for PatriciaSet {
+impl<T: ?Sized> Serialize for PatriciaSet<T> {
     /// In order to serialize a [PatriciaSet], make sure you installed the crate
     /// with the feature `serde`.
     ///
@@ -23,7 +23,7 @@ impl Serialize for PatriciaSet {
     }
 }
 
-impl<T: Serialize> Serialize for PatriciaMap<T> {
+impl<K: ?Sized, V: Serialize> Serialize for PatriciaMap<K, V> {
     /// In order to serialize a [PatriciaMap], make sure you installed the crate
     /// with the feature `serde`.
     ///
@@ -71,7 +71,8 @@ impl<T: Serialize> Serialize for Node<T> {
     }
 }
 
-impl<'de> Deserialize<'de> for PatriciaSet {
+// TODO
+impl<'de, T: ?Sized> Deserialize<'de> for PatriciaSet<T> {
     /// In order to deserialize a [PatriciaSet], make sure you installed the crate
     /// with the feature `serde`.
     ///
@@ -90,7 +91,8 @@ impl<'de> Deserialize<'de> for PatriciaSet {
     }
 }
 
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for PatriciaMap<T> {
+// TODO
+impl<'de, K: ?Sized, V: Deserialize<'de>> Deserialize<'de> for PatriciaMap<K, V> {
     /// In order to serialize a [PatriciaMap], make sure you installed the crate
     /// with the feature `serde`.
     ///
@@ -105,7 +107,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for PatriciaMap<T> {
     where
         D: Deserializer<'de>,
     {
-        Node::<T>::deserialize(deserializer).map(PatriciaMap::from_node)
+        Node::<V>::deserialize(deserializer).map(PatriciaMap::from_node)
     }
 }
 
@@ -232,7 +234,7 @@ impl<'de> Visitor<'de> for BytesVisitor {
 
 #[cfg(test)]
 mod tests {
-    use crate::PatriciaMap;
+    use crate::BytesPatriciaMap;
 
     #[test]
     fn serde_works() {
@@ -243,9 +245,9 @@ mod tests {
         ];
         input.sort();
 
-        let map: PatriciaMap<u32> = input.iter().cloned().collect();
+        let map: BytesPatriciaMap<u32> = input.iter().cloned().collect();
         let bytes = postcard::to_allocvec(&map).unwrap();
-        let map: PatriciaMap<u32> = postcard::from_bytes(&bytes).unwrap();
+        let map: BytesPatriciaMap<u32> = postcard::from_bytes(&bytes).unwrap();
 
         assert_eq!(map.len(), 3);
         assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
@@ -260,9 +262,9 @@ mod tests {
         ];
         input.sort();
 
-        let map: PatriciaMap<u32> = input.iter().cloned().collect();
+        let map: BytesPatriciaMap<u32> = input.iter().cloned().collect();
         let json = serde_json::to_string(&map).unwrap();
-        let map: PatriciaMap<u32> = serde_json::from_str(&json).unwrap();
+        let map: BytesPatriciaMap<u32> = serde_json::from_str(&json).unwrap();
 
         assert_eq!(map.len(), 3);
         assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
@@ -275,9 +277,9 @@ mod tests {
             .collect::<Vec<_>>();
         input.sort();
 
-        let map: PatriciaMap<u32> = input.iter().cloned().collect();
+        let map: BytesPatriciaMap<u32> = input.iter().cloned().collect();
         let bytes = postcard::to_allocvec(&map).unwrap();
-        let map: PatriciaMap<u32> = postcard::from_bytes(&bytes).unwrap();
+        let map: BytesPatriciaMap<u32> = postcard::from_bytes(&bytes).unwrap();
 
         assert_eq!(map.len(), 10000);
         assert_eq!(map.into_iter().collect::<Vec<_>>(), input);

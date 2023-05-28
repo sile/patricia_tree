@@ -1,5 +1,5 @@
 use clap::Parser;
-use patricia_tree::PatriciaSet;
+use patricia_tree::BytesPatriciaSet;
 use std::collections::{BTreeSet, HashSet};
 use std::io::BufRead;
 
@@ -18,7 +18,7 @@ fn main() {
 
     match args.kind.as_str() {
         "patricia" => {
-            let mut set = PatriciaSet::new();
+            let mut set = BytesPatriciaSet::new();
             each_line(|line| {
                 set.insert(line);
             });
