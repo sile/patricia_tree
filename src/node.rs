@@ -55,51 +55,11 @@ unsafe impl<V: Send> Send for Node<V> {}
 unsafe impl<V: Sync> Sync for Node<V> {}
 impl<V> Node<V> {
     /// Makes a new node which represents an empty tree.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use patricia_tree::node::Node;
-    ///
-    /// let node = Node::<()>::root();
-    /// assert!(node.label().is_empty());
-    /// assert!(node.value().is_none());
-    /// assert!(node.child().is_none());
-    /// assert!(node.sibling().is_none());
-    /// ```
     pub fn root() -> Self {
         Node::new(b"", None, None, None)
     }
 
     /// Makes a new node.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use patricia_tree::node::Node;
-    ///
-    /// let node0 = Node::new("foo".as_ref(), Some(3), None, None);
-    /// assert_eq!(node0.label(), b"foo");
-    /// assert_eq!(node0.value(), Some(&3));
-    /// assert_eq!(node0.child().map(|n| n.label()), None);
-    /// assert_eq!(node0.sibling().map(|n| n.label()), None);
-    ///
-    /// let node1 = Node::new("bar".as_ref(), None, None, Some(node0));
-    /// assert_eq!(node1.label(), b"bar");
-    /// assert_eq!(node1.value(), None);
-    /// assert_eq!(node1.child().map(|n| n.label()), None);
-    /// assert_eq!(node1.sibling().map(|n| n.label()), Some(&b"foo"[..]));
-    ///
-    /// // If the length of a label name is longer than 255, it will be splitted to two nodes.
-    /// let node2 = Node::new([b'a'; 256].as_ref(), Some(4), Some(node1), None);
-    /// assert_eq!(node2.label(), [b'a'; 255].as_ref());
-    /// assert_eq!(node2.value(), None);
-    /// assert_eq!(node2.child().map(|n| n.label()), Some(&b"a"[..]));
-    /// assert_eq!(node2.sibling().map(|n| n.label()), None);
-    ///
-    /// assert_eq!(node2.child().unwrap().value(), Some(&4));
-    /// assert_eq!(node2.child().unwrap().child().unwrap().label(), b"bar");
-    /// ```
     pub fn new(
         mut label: &[u8],
         mut value: Option<V>,
@@ -409,29 +369,6 @@ impl<V> Node<V> {
     }
 
     /// Gets an iterator which traverses the nodes in this tree, in depth first order.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use patricia_tree::PatriciaSet;
-    /// use patricia_tree::node::Node;
-    ///
-    /// let mut set = PatriciaSet::new();
-    /// set.insert("foo");
-    /// set.insert("bar");
-    /// set.insert("baz");
-    ///
-    /// let node = Node::from(set);
-    /// let nodes = node.iter().map(|(level, node)| (level, node.label())).collect::<Vec<_>>();
-    /// assert_eq!(nodes,
-    ///            [
-    ///                (0, "".as_ref()),
-    ///                (1, "ba".as_ref()),
-    ///                (2, "r".as_ref()),
-    ///                (2, "z".as_ref()),
-    ///                (1, "foo".as_ref())
-    ///            ]);
-    /// ```
     pub fn iter(&self) -> Iter<V> {
         Iter {
             stack: vec![(0, self)],
@@ -439,29 +376,6 @@ impl<V> Node<V> {
     }
 
     /// Gets a mutable iterator which traverses the nodes in this tree, in depth first order.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use patricia_tree::PatriciaSet;
-    /// use patricia_tree::node::Node;
-    ///
-    /// let mut set = PatriciaSet::new();
-    /// set.insert("foo");
-    /// set.insert("bar");
-    /// set.insert("baz");
-    ///
-    /// let mut node = Node::from(set);
-    /// let nodes = node.iter_mut().map(|(level, node)| (level, node.label())).collect::<Vec<_>>();
-    /// assert_eq!(nodes,
-    ///            [
-    ///                (0, "".as_ref()),
-    ///                (1, "ba".as_ref()),
-    ///                (2, "r".as_ref()),
-    ///                (2, "z".as_ref()),
-    ///                (1, "foo".as_ref())
-    ///            ]);
-    /// ```
     pub fn iter_mut(&mut self) -> IterMut<V> {
         IterMut {
             stack: vec![(0, self)],
@@ -1041,6 +955,92 @@ mod tests {
     use super::*;
     use crate::PatriciaSet;
     use std::str;
+
+    #[test]
+    fn root_works() {
+        let node = Node::<()>::root();
+        assert!(node.label().is_empty());
+        assert!(node.value().is_none());
+        assert!(node.child().is_none());
+        assert!(node.sibling().is_none());
+    }
+
+    #[test]
+    fn new_works() {
+        let node0 = Node::new("foo".as_ref(), Some(3), None, None);
+        assert_eq!(node0.label(), b"foo");
+        assert_eq!(node0.value(), Some(&3));
+        assert_eq!(node0.child().map(|n| n.label()), None);
+        assert_eq!(node0.sibling().map(|n| n.label()), None);
+
+        let node1 = Node::new("bar".as_ref(), None, None, Some(node0));
+        assert_eq!(node1.label(), b"bar");
+        assert_eq!(node1.value(), None);
+        assert_eq!(node1.child().map(|n| n.label()), None);
+        assert_eq!(node1.sibling().map(|n| n.label()), Some(&b"foo"[..]));
+
+        // If the length of a label name is longer than 255, it will be splitted to two nodes.
+        let node2 = Node::new([b'a'; 256].as_ref(), Some(4), Some(node1), None);
+        assert_eq!(node2.label(), [b'a'; 255].as_ref());
+        assert_eq!(node2.value(), None);
+        assert_eq!(node2.child().map(|n| n.label()), Some(&b"a"[..]));
+        assert_eq!(node2.sibling().map(|n| n.label()), None);
+
+        assert_eq!(node2.child().unwrap().value(), Some(&4));
+        assert_eq!(node2.child().unwrap().child().unwrap().label(), b"bar");
+    }
+
+    #[test]
+    fn ietr_works() {
+        use crate::PatriciaSet;
+
+        let mut set = PatriciaSet::new();
+        set.insert("foo");
+        set.insert("bar");
+        set.insert("baz");
+
+        let root = set.into_node();
+        let nodes = root
+            .iter()
+            .map(|(level, node)| (level, node.label()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            nodes,
+            [
+                (0, "".as_ref()),
+                (1, "ba".as_ref()),
+                (2, "r".as_ref()),
+                (2, "z".as_ref()),
+                (1, "foo".as_ref())
+            ]
+        );
+    }
+
+    #[test]
+    fn iter_mut_works() {
+        use crate::PatriciaSet;
+
+        let mut set = PatriciaSet::new();
+        set.insert("foo");
+        set.insert("bar");
+        set.insert("baz");
+
+        let mut root = set.into_node();
+        let nodes = root
+            .iter_mut()
+            .map(|(level, node)| (level, node.label()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            nodes,
+            [
+                (0, "".as_ref()),
+                (1, "ba".as_ref()),
+                (2, "r".as_ref()),
+                (2, "z".as_ref()),
+                (1, "foo".as_ref())
+            ]
+        );
+    }
 
     #[test]
     fn long_label_works() {

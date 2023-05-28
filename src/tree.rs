@@ -17,6 +17,10 @@ impl<V> PatriciaTree<V> {
     pub fn root(&self) -> &Node<V> {
         &self.root
     }
+    #[cfg(test)]
+    pub fn into_root(self) -> Node<V> {
+        self.root
+    }
     pub fn insert<K: AsRef<[u8]>>(&mut self, key: K, value: V) -> Option<V> {
         if let Some(old) = self.root.insert(key.as_ref(), value) {
             Some(old)
