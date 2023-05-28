@@ -1,18 +1,23 @@
 //! A set based on a patricia tree.
-use crate::map::{self, PatriciaMap};
+use crate::map::{self, GenericPatriciaMap};
 #[cfg(any(feature = "serde", test))]
 use crate::node::Node;
+use crate::Bytes;
 use std::fmt;
 use std::iter::FromIterator;
 
-/// A set based on a patricia tree.
-#[derive(Default, Clone)]
-pub struct PatriciaSet {
-    map: PatriciaMap<()>,
-}
+/// Patricia tree based set with [`Vec<u8>`] as key.
+pub type PatriciaSet = GenericPatriciaSet<Vec<u8>>;
 
-impl PatriciaSet {
-    /// Makes a new empty `PatriciaSet` instance.
+/// Patricia tree based set with [`String`] as key.
+pub type StringPatriciaSet = GenericPatriciaSet<String>;
+
+/// Patricia tree based set.
+pub struct GenericPatriciaSet<T> {
+    map: GenericPatriciaMap<T, ()>,
+}
+impl<T> GenericPatriciaSet<T> {
+    /// Makes a new empty [`GenericPatriciaSet`] instance.
     ///
     /// # Examples
     ///
@@ -23,8 +28,8 @@ impl PatriciaSet {
     /// assert!(set.is_empty());
     /// ```
     pub fn new() -> Self {
-        PatriciaSet {
-            map: PatriciaMap::new(),
+        GenericPatriciaSet {
+            map: GenericPatriciaMap::new(),
         }
     }
 
@@ -80,6 +85,24 @@ impl PatriciaSet {
         self.map.clear();
     }
 
+    #[cfg(feature = "serde")]
+    pub(crate) fn from_node(node: Node<()>) -> Self {
+        Self {
+            map: GenericPatriciaMap::from_node(node),
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn as_node(&self) -> &Node<()> {
+        self.map.as_node()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn into_node(self) -> Node<()> {
+        self.map.into_node()
+    }
+}
+impl<T: Bytes> GenericPatriciaSet<T> {
     /// Returns `true` if this set contains a value.
     ///
     /// # Examples
@@ -92,7 +115,7 @@ impl PatriciaSet {
     /// assert!(set.contains("foo"));
     /// assert!(!set.contains("bar"));
     /// ```
-    pub fn contains<T: AsRef<[u8]>>(&self, value: T) -> bool {
+    pub fn contains<U: AsRef<T::Borrowed>>(&self, value: U) -> bool {
         self.map.get(value).is_some()
     }
 
@@ -104,6 +127,7 @@ impl PatriciaSet {
     /// use patricia_tree::PatriciaSet;
     ///
     /// let mut set = PatriciaSet::new();
+    ///
     /// set.insert("foo");
     /// set.insert("foobar");
     /// assert_eq!(set.get_longest_common_prefix("fo"), None);
@@ -112,13 +136,11 @@ impl PatriciaSet {
     /// assert_eq!(set.get_longest_common_prefix("foobar"), Some("foobar".as_bytes()));
     /// assert_eq!(set.get_longest_common_prefix("foobarbaz"), Some("foobar".as_bytes()));
     /// ```
-    pub fn get_longest_common_prefix<'a, T>(&self, value: &'a T) -> Option<&'a [u8]>
+    pub fn get_longest_common_prefix<'a, U>(&self, value: &'a U) -> Option<&'a T::Borrowed>
     where
-        T: AsRef<[u8]> + ?Sized,
+        U: ?Sized + AsRef<T::Borrowed>,
     {
-        self.map
-            .get_longest_common_prefix(value.as_ref())
-            .map(|x| x.0)
+        self.map.get_longest_common_prefix(value).map(|x| x.0)
     }
 
     /// Adds a value to this set.
@@ -136,13 +158,8 @@ impl PatriciaSet {
     /// assert!(!set.insert("foo"));
     /// assert_eq!(set.len(), 1);
     /// ```
-    pub fn insert<T: AsRef<[u8]>>(&mut self, value: T) -> bool {
+    pub fn insert<U: AsRef<T::Borrowed>>(&mut self, value: U) -> bool {
         self.map.insert(value, ()).is_none()
-    }
-
-    /// As with [`PatriciaSet::insert()`] except for that this method regards UTF-8 character boundaries of the input value.
-    pub fn insert_str(&mut self, value: &str) -> bool {
-        self.map.insert_str(value, ()).is_none()
     }
 
     /// Removes a value from the set. Returns `true` is the value was present in this set.
@@ -157,7 +174,7 @@ impl PatriciaSet {
     /// assert_eq!(set.remove("foo"), true);
     /// assert_eq!(set.remove("foo"), false);
     /// ```
-    pub fn remove<T: AsRef<[u8]>>(&mut self, value: T) -> bool {
+    pub fn remove<U: AsRef<T::Borrowed>>(&mut self, value: U) -> bool {
         self.map.remove(value).is_some()
     }
 
@@ -181,8 +198,8 @@ impl PatriciaSet {
     /// assert_eq!(a.iter().collect::<Vec<_>>(), [b"erlang", b"python"]);
     /// assert_eq!(b.iter().collect::<Vec<_>>(), [b"ruby", b"rust"]);
     /// ```
-    pub fn split_by_prefix<T: AsRef<[u8]>>(&mut self, prefix: T) -> Self {
-        PatriciaSet {
+    pub fn split_by_prefix<U: AsRef<T::Borrowed>>(&mut self, prefix: U) -> Self {
+        GenericPatriciaSet {
             map: self.map.split_by_prefix(prefix),
         }
     }
@@ -201,10 +218,11 @@ impl PatriciaSet {
     ///
     /// assert_eq!(set.iter().collect::<Vec<_>>(), [Vec::from("bar"), "baz".into(), "foo".into()]);
     /// ```
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<T> {
         Iter(self.map.keys())
     }
-
+}
+impl<T: Bytes> GenericPatriciaSet<T> {
     /// Gets an iterator over the contents having the given prefix of this set, in sorted order.
     ///
     /// # Examples
@@ -219,31 +237,14 @@ impl PatriciaSet {
     ///
     /// assert_eq!(set.iter_prefix(b"ba").collect::<Vec<_>>(), [Vec::from("bar"), "baz".into()]);
     /// ```
-    pub fn iter_prefix<'a, 'b>(&'a self, prefix: &'b [u8]) -> impl 'a + Iterator<Item = Vec<u8>>
+    pub fn iter_prefix<'a, 'b>(&'a self, prefix: &'b T::Borrowed) -> impl 'a + Iterator<Item = T>
     where
         'b: 'a,
     {
         self.map.iter_prefix(prefix).map(|(k, _)| k)
     }
-
-    #[cfg(feature = "serde")]
-    pub(crate) fn from_node(node: Node<()>) -> Self {
-        Self {
-            map: PatriciaMap::from_node(node),
-        }
-    }
-
-    #[cfg(feature = "serde")]
-    pub(crate) fn as_node(&self) -> &Node<()> {
-        self.map.as_node()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn into_node(self) -> Node<()> {
-        self.map.into_node()
-    }
 }
-impl fmt::Debug for PatriciaSet {
+impl<T: Bytes + fmt::Debug> fmt::Debug for GenericPatriciaSet<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{")?;
         for (i, t) in self.iter().enumerate() {
@@ -256,29 +257,41 @@ impl fmt::Debug for PatriciaSet {
         Ok(())
     }
 }
-impl IntoIterator for PatriciaSet {
-    type Item = Vec<u8>;
-    type IntoIter = IntoIter;
+impl<T> Clone for GenericPatriciaSet<T> {
+    fn clone(&self) -> Self {
+        GenericPatriciaSet {
+            map: self.map.clone(),
+        }
+    }
+}
+impl<T> Default for GenericPatriciaSet<T> {
+    fn default() -> Self {
+        GenericPatriciaSet::new()
+    }
+}
+impl<T: Bytes> IntoIterator for GenericPatriciaSet<T> {
+    type Item = T;
+    type IntoIter = IntoIter<T>;
     fn into_iter(self) -> Self::IntoIter {
         IntoIter(self.map.into_iter())
     }
 }
-impl<T: AsRef<[u8]>> FromIterator<T> for PatriciaSet {
+impl<T: Bytes, U: AsRef<T::Borrowed>> FromIterator<U> for GenericPatriciaSet<T> {
     fn from_iter<I>(iter: I) -> Self
     where
-        I: IntoIterator<Item = T>,
+        I: IntoIterator<Item = U>,
     {
-        let mut set = PatriciaSet::new();
+        let mut set = GenericPatriciaSet::new();
         for t in iter {
             set.insert(t);
         }
         set
     }
 }
-impl<T: AsRef<[u8]>> Extend<T> for PatriciaSet {
+impl<T: Bytes, U: AsRef<T::Borrowed>> Extend<U> for GenericPatriciaSet<T> {
     fn extend<I>(&mut self, iter: I)
     where
-        I: IntoIterator<Item = T>,
+        I: IntoIterator<Item = U>,
     {
         for t in iter {
             self.insert(t);
@@ -288,9 +301,9 @@ impl<T: AsRef<[u8]>> Extend<T> for PatriciaSet {
 
 /// An Iterator over a `PatriciaSet`'s items.
 #[derive(Debug)]
-pub struct Iter<'a>(map::Keys<'a, ()>);
-impl<'a> Iterator for Iter<'a> {
-    type Item = Vec<u8>;
+pub struct Iter<'a, T>(map::Keys<'a, T, ()>);
+impl<'a, T: Bytes> Iterator for Iter<'a, T> {
+    type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
@@ -298,9 +311,9 @@ impl<'a> Iterator for Iter<'a> {
 
 /// An owning iterator over a `PatriciaSet`'s items.
 #[derive(Debug)]
-pub struct IntoIter(map::IntoIter<()>);
-impl Iterator for IntoIter {
-    type Item = Vec<u8>;
+pub struct IntoIter<T>(map::IntoIter<T, ()>);
+impl<T: Bytes> Iterator for IntoIter<T> {
+    type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(|(k, _)| k)
     }

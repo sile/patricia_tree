@@ -1,16 +1,24 @@
 //! A map based on a patricia tree.
 use crate::node::{self, Node};
 use crate::tree::{self, PatriciaTree};
+use crate::{BorrowedBytes, Bytes};
 use std::fmt;
 use std::iter::FromIterator;
+use std::marker::PhantomData;
 
-/// A map based on a patricia tree.
-#[derive(Clone)]
-pub struct PatriciaMap<V> {
+/// Patricia tree based map with [`Vec<u8>`] as key.
+pub type PatriciaMap<V> = GenericPatriciaMap<Vec<u8>, V>;
+
+/// Patricia tree based map with [`String`] as key.
+pub type StringPatriciaMap<V> = GenericPatriciaMap<String, V>;
+
+/// Patricia tree based map.
+pub struct GenericPatriciaMap<K, V> {
     tree: PatriciaTree<V>,
+    _key: PhantomData<K>,
 }
 
-impl<V> PatriciaMap<V> {
+impl<K, V> GenericPatriciaMap<K, V> {
     /// Makes a new empty `PatriciaMap` instance.
     ///
     /// # Examples
@@ -29,8 +37,9 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(map.get("foo"), None);
     /// ```
     pub fn new() -> Self {
-        PatriciaMap {
+        GenericPatriciaMap {
             tree: PatriciaTree::new(),
+            _key: PhantomData,
         }
     }
 
@@ -50,6 +59,61 @@ impl<V> PatriciaMap<V> {
         self.tree.clear();
     }
 
+    /// Returns the number of elements in this map.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map = PatriciaMap::new();
+    /// map.insert("foo", 1);
+    /// map.insert("bar", 2);
+    /// assert_eq!(map.len(), 2);
+    /// ```
+    pub fn len(&self) -> usize {
+        self.tree.len()
+    }
+
+    /// Returns `true` if this map contains no elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map = PatriciaMap::new();
+    /// assert!(map.is_empty());
+    ///
+    /// map.insert("foo", 1);
+    /// assert!(!map.is_empty());
+    ///
+    /// map.clear();
+    /// assert!(map.is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn from_node(node: Node<V>) -> Self {
+        Self {
+            tree: node.into(),
+            _key: PhantomData,
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn as_node(&self) -> &Node<V> {
+        self.tree.root()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn into_node(self) -> Node<V> {
+        self.tree.into_root()
+    }
+}
+impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// Returns `true` if this map contains a value for the specified key.
     ///
     /// # Examples
@@ -62,8 +126,8 @@ impl<V> PatriciaMap<V> {
     /// assert!(map.contains_key("foo"));
     /// assert!(!map.contains_key("bar"));
     /// ```
-    pub fn contains_key<K: AsRef<[u8]>>(&self, key: K) -> bool {
-        self.tree.get(key).is_some()
+    pub fn contains_key<Q: AsRef<K::Borrowed>>(&self, key: Q) -> bool {
+        self.tree.get(key.as_ref().as_bytes()).is_some()
     }
 
     /// Returns a reference to the value corresponding to the key.
@@ -78,8 +142,8 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(map.get("foo"), Some(&1));
     /// assert_eq!(map.get("bar"), None);
     /// ```
-    pub fn get<K: AsRef<[u8]>>(&self, key: K) -> Option<&V> {
-        self.tree.get(key)
+    pub fn get<Q: AsRef<K::Borrowed>>(&self, key: Q) -> Option<&V> {
+        self.tree.get(key.as_ref().as_bytes())
     }
 
     /// Returns a mutable reference to the value corresponding to the key.
@@ -94,8 +158,8 @@ impl<V> PatriciaMap<V> {
     /// map.get_mut("foo").map(|v| *v = 2);
     /// assert_eq!(map.get("foo"), Some(&2));
     /// ```
-    pub fn get_mut<K: AsRef<[u8]>>(&mut self, key: K) -> Option<&mut V> {
-        self.tree.get_mut(key)
+    pub fn get_mut<Q: AsRef<K::Borrowed>>(&mut self, key: Q) -> Option<&mut V> {
+        self.tree.get_mut(key.as_ref().as_bytes())
     }
 
     /// Finds the longest common prefix of `key` and the keys in this map,
@@ -115,11 +179,14 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(map.get_longest_common_prefix("foobar"), Some(("foobar".as_bytes(), &2)));
     /// assert_eq!(map.get_longest_common_prefix("foobarbaz"), Some(("foobar".as_bytes(), &2)));
     /// ```
-    pub fn get_longest_common_prefix<'a, K>(&self, key: &'a K) -> Option<(&'a [u8], &V)>
+    pub fn get_longest_common_prefix<'a, Q>(&self, key: &'a Q) -> Option<(&'a K::Borrowed, &V)>
     where
-        K: AsRef<[u8]> + ?Sized,
+        Q: ?Sized + AsRef<K::Borrowed>,
     {
-        self.tree.get_longest_common_prefix(key.as_ref())
+        let (key, value) = self
+            .tree
+            .get_longest_common_prefix(key.as_ref().as_bytes())?;
+        Some((K::Borrowed::from_bytes(key), value))
     }
 
     /// Inserts a key-value pair into this map.
@@ -138,13 +205,8 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(map.insert("foo", 2), Some(1));
     /// assert_eq!(map.get("foo"), Some(&2));
     /// ```
-    pub fn insert<K: AsRef<[u8]>>(&mut self, key: K, value: V) -> Option<V> {
-        self.tree.insert(key, value)
-    }
-
-    /// As with [`PatriciaMap::insert()`] except for that this method regards UTF-8 character boundaries of the input key.
-    pub fn insert_str(&mut self, key: &str, value: V) -> Option<V> {
-        self.tree.insert_str(key, value)
+    pub fn insert<Q: AsRef<K::Borrowed>>(&mut self, key: Q, value: V) -> Option<V> {
+        self.tree.insert(key.as_ref(), value)
     }
 
     /// Removes a key from this map, returning the value at the key if the key was previously in it.
@@ -159,8 +221,8 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(map.remove("foo"), Some(1));
     /// assert_eq!(map.remove("foo"), None);
     /// ```
-    pub fn remove<K: AsRef<[u8]>>(&mut self, key: K) -> Option<V> {
-        self.tree.remove(key)
+    pub fn remove<Q: AsRef<K::Borrowed>>(&mut self, key: Q) -> Option<V> {
+        self.tree.remove(key.as_ref().as_bytes())
     }
 
     /// Returns an iterator that collects all entries in the map up to a certain key.
@@ -169,6 +231,7 @@ impl<V> PatriciaMap<V> {
     ///
     /// ```
     /// use patricia_tree::PatriciaMap;
+    ///
     /// let mut t = PatriciaMap::new();
     /// t.insert("a", vec!["a"]);
     /// t.insert("x", vec!["x"]);
@@ -182,13 +245,14 @@ impl<V> PatriciaMap<V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefixes<'a, 'b>(&'a self, key: &'b [u8]) -> CommonPrefixesIter<'a, 'b, V>
+    pub fn common_prefixes<'a, 'b>(&'a self, key: &'b [u8]) -> CommonPrefixesIter<'a, 'b, K, V>
     where
         'a: 'b,
     {
         CommonPrefixesIter {
-            key,
+            key_bytes: key,
             iterator: self.tree.common_prefixes(key),
+            _key: PhantomData,
         }
     }
 
@@ -239,45 +303,12 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(a.keys().collect::<Vec<_>>(), [b"bash", b"ruby", b"rust"]);
     /// assert_eq!(b.keys().collect::<Vec<_>>(), [b"elixir", b"erlang"]);
     /// ```
-    pub fn split_by_prefix<K: AsRef<[u8]>>(&mut self, prefix: K) -> Self {
-        let subtree = self.tree.split_by_prefix(prefix);
-        PatriciaMap { tree: subtree }
-    }
-
-    /// Returns the number of elements in this map.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use patricia_tree::PatriciaMap;
-    ///
-    /// let mut map = PatriciaMap::new();
-    /// map.insert("foo", 1);
-    /// map.insert("bar", 2);
-    /// assert_eq!(map.len(), 2);
-    /// ```
-    pub fn len(&self) -> usize {
-        self.tree.len()
-    }
-
-    /// Returns `true` if this map contains no elements.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use patricia_tree::PatriciaMap;
-    ///
-    /// let mut map = PatriciaMap::new();
-    /// assert!(map.is_empty());
-    ///
-    /// map.insert("foo", 1);
-    /// assert!(!map.is_empty());
-    ///
-    /// map.clear();
-    /// assert!(map.is_empty());
-    /// ```
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+    pub fn split_by_prefix<Q: AsRef<K::Borrowed>>(&mut self, prefix: Q) -> Self {
+        let subtree = self.tree.split_by_prefix(prefix.as_ref().as_bytes());
+        GenericPatriciaMap {
+            tree: subtree,
+            _key: PhantomData,
+        }
     }
 
     /// Gets an iterator over the entries of this map, sorted by key.
@@ -292,7 +323,7 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(vec![(Vec::from("bar"), &2), ("baz".into(), &3), ("foo".into(), &1)],
     ///            map.iter().collect::<Vec<_>>());
     /// ```
-    pub fn iter(&self) -> Iter<V> {
+    pub fn iter(&self) -> Iter<K, V> {
         Iter::new(self.tree.nodes(), Vec::new())
     }
 
@@ -310,60 +341,8 @@ impl<V> PatriciaMap<V> {
     /// }
     /// assert_eq!(map.get("bar"), Some(&12));
     /// ```
-    pub fn iter_mut(&mut self) -> IterMut<V> {
+    pub fn iter_mut(&mut self) -> IterMut<K, V> {
         IterMut::new(self.tree.nodes_mut(), Vec::new())
-    }
-
-    /// Gets an iterator over the entries having the given prefix of this map, sorted by key.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use patricia_tree::PatriciaMap;
-    ///
-    /// let map: PatriciaMap<_> =
-    ///     vec![("foo", 1), ("bar", 2), ("baz", 3)].into_iter().collect();
-    /// assert_eq!(vec![(Vec::from("bar"), &2), ("baz".into(), &3)],
-    ///            map.iter_prefix(b"ba").collect::<Vec<_>>());
-    /// ```
-    pub fn iter_prefix<'a, 'b>(
-        &'a self,
-        prefix: &'b [u8],
-    ) -> impl 'a + Iterator<Item = (Vec<u8>, &'a V)>
-    where
-        'b: 'a,
-    {
-        self.tree
-            .iter_prefix(prefix)
-            .into_iter()
-            .flat_map(move |(prefix_len, nodes)| Iter::new(nodes, Vec::from(&prefix[..prefix_len])))
-    }
-
-    /// Gets a mutable iterator over the entries having the given prefix of this map, sorted by key.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use patricia_tree::PatriciaMap;
-    ///
-    /// let mut map: PatriciaMap<_> =
-    ///     vec![("foo", 1), ("bar", 2), ("baz", 3)].into_iter().collect();
-    /// assert_eq!(vec![(Vec::from("bar"), &mut 2), ("baz".into(), &mut 3)],
-    ///            map.iter_prefix_mut(b"ba").collect::<Vec<_>>());
-    /// ```
-    pub fn iter_prefix_mut<'a, 'b>(
-        &'a mut self,
-        prefix: &'b [u8],
-    ) -> impl 'a + Iterator<Item = (Vec<u8>, &'a mut V)>
-    where
-        'b: 'a,
-    {
-        self.tree
-            .iter_prefix_mut(prefix)
-            .into_iter()
-            .flat_map(move |(prefix_len, nodes)| {
-                IterMut::new(nodes, Vec::from(&prefix[..prefix_len]))
-            })
     }
 
     /// Gets an iterator over the keys of this map, in sorted order.
@@ -378,7 +357,7 @@ impl<V> PatriciaMap<V> {
     /// assert_eq!(vec![Vec::from("bar"), "baz".into(), "foo".into()],
     ///            map.keys().collect::<Vec<_>>());
     /// ```
-    pub fn keys(&self) -> Keys<V> {
+    pub fn keys(&self) -> Keys<K, V> {
         Keys(self.iter())
     }
 
@@ -420,23 +399,63 @@ impl<V> PatriciaMap<V> {
             nodes: self.tree.nodes(),
         }
     }
-
-    #[cfg(feature = "serde")]
-    pub(crate) fn from_node(node: Node<V>) -> Self {
-        Self { tree: node.into() }
+}
+impl<K: Bytes, V> GenericPatriciaMap<K, V> {
+    /// Gets an iterator over the entries having the given prefix of this map, sorted by key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let map: PatriciaMap<_> =
+    ///     vec![("foo", 1), ("bar", 2), ("baz", 3)].into_iter().collect();
+    /// assert_eq!(vec![(Vec::from("bar"), &2), ("baz".into(), &3)],
+    ///            map.iter_prefix(b"ba").collect::<Vec<_>>());
+    /// ```
+    pub fn iter_prefix<'a, 'b>(
+        &'a self,
+        prefix: &'b K::Borrowed,
+    ) -> impl 'a + Iterator<Item = (K, &'a V)>
+    where
+        'b: 'a,
+    {
+        self.tree
+            .iter_prefix(prefix.as_bytes())
+            .into_iter()
+            .flat_map(move |(prefix_len, nodes)| {
+                Iter::<K, V>::new(nodes, Vec::from(&prefix.as_bytes()[..prefix_len]))
+            })
     }
 
-    #[cfg(feature = "serde")]
-    pub(crate) fn as_node(&self) -> &Node<V> {
-        self.tree.root()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn into_node(self) -> Node<V> {
-        self.tree.into_root()
+    /// Gets a mutable iterator over the entries having the given prefix of this map, sorted by key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map: PatriciaMap<_> =
+    ///     vec![("foo", 1), ("bar", 2), ("baz", 3)].into_iter().collect();
+    /// assert_eq!(vec![(Vec::from("bar"), &mut 2), ("baz".into(), &mut 3)],
+    ///            map.iter_prefix_mut(b"ba").collect::<Vec<_>>());
+    /// ```
+    pub fn iter_prefix_mut<'a, 'b>(
+        &'a mut self,
+        prefix: &'b K::Borrowed,
+    ) -> impl 'a + Iterator<Item = (K, &'a mut V)>
+    where
+        'b: 'a,
+    {
+        self.tree
+            .iter_prefix_mut(prefix.as_bytes())
+            .into_iter()
+            .flat_map(move |(prefix_len, nodes)| {
+                IterMut::<K, V>::new(nodes, Vec::from(&prefix.as_bytes()[..prefix_len]))
+            })
     }
 }
-impl<V: fmt::Debug> fmt::Debug for PatriciaMap<V> {
+impl<K: Bytes + fmt::Debug, V: fmt::Debug> fmt::Debug for GenericPatriciaMap<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{")?;
         for (i, (k, v)) in self.iter().enumerate() {
@@ -449,43 +468,54 @@ impl<V: fmt::Debug> fmt::Debug for PatriciaMap<V> {
         Ok(())
     }
 }
-impl<V> Default for PatriciaMap<V> {
+impl<K, V: Clone> Clone for GenericPatriciaMap<K, V> {
+    fn clone(&self) -> Self {
+        Self {
+            tree: self.tree.clone(),
+            _key: PhantomData,
+        }
+    }
+}
+impl<K, V> Default for GenericPatriciaMap<K, V> {
     fn default() -> Self {
         Self::new()
     }
 }
-impl<V> IntoIterator for PatriciaMap<V> {
-    type Item = (Vec<u8>, V);
-    type IntoIter = IntoIter<V>;
+impl<K: Bytes, V> IntoIterator for GenericPatriciaMap<K, V> {
+    type Item = (K, V);
+    type IntoIter = IntoIter<K, V>;
     fn into_iter(self) -> Self::IntoIter {
         IntoIter {
             nodes: self.tree.into_nodes(),
-            key: Vec::new(),
+            key_bytes: Vec::new(),
+            _key: PhantomData,
         }
     }
 }
-impl<K, V> FromIterator<(K, V)> for PatriciaMap<V>
+impl<K, Q, V> FromIterator<(Q, V)> for GenericPatriciaMap<K, V>
 where
-    K: AsRef<[u8]>,
+    K: Bytes,
+    Q: AsRef<K::Borrowed>,
 {
     fn from_iter<I>(iter: I) -> Self
     where
-        I: IntoIterator<Item = (K, V)>,
+        I: IntoIterator<Item = (Q, V)>,
     {
-        let mut map = PatriciaMap::new();
+        let mut map = GenericPatriciaMap::new();
         for (k, v) in iter {
             map.insert(k, v);
         }
         map
     }
 }
-impl<K, V> Extend<(K, V)> for PatriciaMap<V>
+impl<K, Q, V> Extend<(Q, V)> for GenericPatriciaMap<K, V>
 where
-    K: AsRef<[u8]>,
+    K: Bytes,
+    Q: AsRef<K::Borrowed>,
 {
     fn extend<I>(&mut self, iter: I)
     where
-        I: IntoIterator<Item = (K, V)>,
+        I: IntoIterator<Item = (Q, V)>,
     {
         for (k, v) in iter {
             self.insert(k, v);
@@ -495,29 +525,31 @@ where
 
 /// An iterator over a `PatriciaMap`'s entries.
 #[derive(Debug)]
-pub struct Iter<'a, V: 'a> {
+pub struct Iter<'a, K, V: 'a> {
     nodes: tree::Nodes<'a, V>,
-    key: Vec<u8>,
+    key_bytes: Vec<u8>,
     key_offset: usize,
+    _key: PhantomData<K>,
 }
-impl<'a, V: 'a> Iter<'a, V> {
+impl<'a, K, V: 'a> Iter<'a, K, V> {
     fn new(nodes: tree::Nodes<'a, V>, key: Vec<u8>) -> Self {
         let key_offset = key.len();
         Self {
             nodes,
-            key,
+            key_bytes: key,
             key_offset,
+            _key: PhantomData,
         }
     }
 }
-impl<'a, V: 'a> Iterator for Iter<'a, V> {
-    type Item = (Vec<u8>, &'a V);
+impl<'a, K: Bytes, V: 'a> Iterator for Iter<'a, K, V> {
+    type Item = (K, &'a V);
     fn next(&mut self) -> Option<Self::Item> {
         for (key_len, node) in &mut self.nodes {
-            self.key.truncate(self.key_offset + key_len);
-            self.key.extend(node.label());
+            self.key_bytes.truncate(self.key_offset + key_len);
+            self.key_bytes.extend(node.label());
             if let Some(value) = node.value() {
-                return Some((self.key.clone(), value));
+                return Some((K::Borrowed::from_bytes(&self.key_bytes).to_owned(), value));
             }
         }
         None
@@ -526,18 +558,19 @@ impl<'a, V: 'a> Iterator for Iter<'a, V> {
 
 /// An owning iterator over a `PatriciaMap`'s entries.
 #[derive(Debug)]
-pub struct IntoIter<V> {
+pub struct IntoIter<K, V> {
     nodes: tree::IntoNodes<V>,
-    key: Vec<u8>,
+    key_bytes: Vec<u8>,
+    _key: PhantomData<K>,
 }
-impl<V> Iterator for IntoIter<V> {
-    type Item = (Vec<u8>, V);
+impl<K: Bytes, V> Iterator for IntoIter<K, V> {
+    type Item = (K, V);
     fn next(&mut self) -> Option<Self::Item> {
         for (key_len, mut node) in &mut self.nodes {
-            self.key.truncate(key_len);
-            self.key.extend(node.label());
+            self.key_bytes.truncate(key_len);
+            self.key_bytes.extend(node.label());
             if let Some(value) = node.take_value() {
-                return Some((self.key.clone(), value));
+                return Some((K::Borrowed::from_bytes(&self.key_bytes).to_owned(), value));
             }
         }
         None
@@ -546,23 +579,28 @@ impl<V> Iterator for IntoIter<V> {
 
 /// A mutable iterator over a `PatriciaMap`'s entries.
 #[derive(Debug)]
-pub struct IterMut<'a, V: 'a> {
+pub struct IterMut<'a, K, V: 'a> {
     nodes: tree::NodesMut<'a, V>,
-    key: Vec<u8>,
+    key_bytes: Vec<u8>,
+    _key: PhantomData<K>,
 }
-impl<'a, V: 'a> IterMut<'a, V> {
+impl<'a, K, V: 'a> IterMut<'a, K, V> {
     fn new(nodes: tree::NodesMut<'a, V>, key: Vec<u8>) -> Self {
-        Self { nodes, key }
+        Self {
+            nodes,
+            key_bytes: key,
+            _key: PhantomData,
+        }
     }
 }
-impl<'a, V: 'a> Iterator for IterMut<'a, V> {
-    type Item = (Vec<u8>, &'a mut V);
+impl<'a, K: Bytes, V: 'a> Iterator for IterMut<'a, K, V> {
+    type Item = (K, &'a mut V);
     fn next(&mut self) -> Option<Self::Item> {
         for (key_len, node) in &mut self.nodes {
-            self.key.truncate(key_len);
-            self.key.extend(node.label());
+            self.key_bytes.truncate(key_len);
+            self.key_bytes.extend(node.label());
             if let Some(value) = node.into_value_mut() {
-                return Some((self.key.clone(), value));
+                return Some((K::Borrowed::from_bytes(&self.key_bytes).to_owned(), value));
             }
         }
         None
@@ -571,9 +609,9 @@ impl<'a, V: 'a> Iterator for IterMut<'a, V> {
 
 /// An iterator over a `PatriciaMap`'s keys.
 #[derive(Debug)]
-pub struct Keys<'a, V: 'a>(Iter<'a, V>);
-impl<'a, V: 'a> Iterator for Keys<'a, V> {
-    type Item = Vec<u8>;
+pub struct Keys<'a, K, V: 'a>(Iter<'a, K, V>);
+impl<'a, K: Bytes, V: 'a> Iterator for Keys<'a, K, V> {
+    type Item = K;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(|(k, _)| k)
     }
@@ -618,17 +656,18 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
 /// An iterator over entries in a `PatriciaMap` that share a common prefix with
 /// a given key.
 #[derive(Debug)]
-pub struct CommonPrefixesIter<'a, 'b, V> {
-    key: &'b [u8],
+pub struct CommonPrefixesIter<'a, 'b, K, V> {
+    key_bytes: &'b [u8],
     iterator: node::CommonPrefixesIter<'a, &'b [u8], V>,
+    _key: PhantomData<K>,
 }
-impl<'a, 'b, V> Iterator for CommonPrefixesIter<'a, 'b, V> {
-    type Item = (&'b [u8], &'a V);
+impl<'a, 'b, K: 'b + Bytes, V> Iterator for CommonPrefixesIter<'a, 'b, K, V> {
+    type Item = (&'b K::Borrowed, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
         for (prefix_len, n) in self.iterator.by_ref() {
             if let Some(v) = n.value() {
-                return Some((&self.key[..prefix_len], v));
+                return Some((K::Borrowed::from_bytes(&self.key_bytes[..prefix_len]), v));
             }
         }
 
@@ -852,7 +891,7 @@ mod tests {
     }
 
     #[test]
-    fn utf8_keys_works() {
+    fn string_patricia_map_works() {
         // Insert as bytes.
         let mut t = PatriciaMap::new();
         t.insert("🌏🗻", ()); // [240,159,140,143,240,159,151,187]
@@ -863,9 +902,9 @@ mod tests {
         assert_eq!(first_label, [240, 159, 140, 143, 240, 159]);
 
         // Insert as string.
-        let mut t = PatriciaMap::new();
-        t.insert_str("🌏🗻", ());
-        t.insert_str("🌏🍔", ());
+        let mut t = StringPatriciaMap::new();
+        t.insert("🌏🗻", ());
+        t.insert("🌏🍔", ());
 
         let first_label = t.as_node().child().unwrap().label();
         assert_eq!(std::str::from_utf8(first_label).ok(), Some("🌏"));
