@@ -1,5 +1,6 @@
 //! A set based on a patricia tree.
 use crate::map::{self, PatriciaMap};
+#[cfg(any(feature = "serde", test))]
 use crate::node::Node;
 use std::fmt;
 use std::iter::FromIterator;
@@ -140,32 +141,6 @@ impl PatriciaSet {
     }
 
     /// As with [`PatriciaSet::insert()`] except for that this method regards UTF-8 character boundaries of the input value.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use patricia_tree::PatriciaSet;
-    ///
-    /// // Insert values as opaque byte strings.
-    /// //
-    /// // Node labels can be arbitrary byte strings.
-    /// let mut set = PatriciaSet::new();
-    /// set.insert("🌏🗻"); // [240, 159, 140, 143, 240, 159, 151, 187]
-    /// set.insert("🌏🍔"); // [240, 159, 140, 143, 240, 159, 141, 148]
-    ///
-    /// let first_label = set.as_ref().child().unwrap().label();
-    /// assert_eq!(first_label, [240, 159, 140, 143, 240, 159]);
-    ///
-    /// // Insert values as UTF-8 strings.
-    /// //
-    /// // Node labels are guaranteed to be UTF-8 byte strings.
-    /// let mut set = PatriciaSet::new();
-    /// set.insert_str("🌏🗻");
-    /// set.insert_str("🌏🍔");
-    ///
-    /// let first_label = set.as_ref().child().unwrap().label();
-    /// assert_eq!(first_label, "🌏".as_bytes());
-    /// ```
     pub fn insert_str(&mut self, value: &str) -> bool {
         self.map.insert_str(value, ()).is_none()
     }
@@ -250,6 +225,23 @@ impl PatriciaSet {
     {
         self.map.iter_prefix(prefix).map(|(k, _)| k)
     }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn from_node(node: Node<()>) -> Self {
+        Self {
+            map: PatriciaMap::from_node(node),
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn as_node(&self) -> &Node<()> {
+        self.map.as_node()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn into_node(self) -> Node<()> {
+        self.map.into_node()
+    }
 }
 impl fmt::Debug for PatriciaSet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -291,21 +283,6 @@ impl<T: AsRef<[u8]>> Extend<T> for PatriciaSet {
         for t in iter {
             self.insert(t);
         }
-    }
-}
-impl From<Node<()>> for PatriciaSet {
-    fn from(f: Node<()>) -> Self {
-        PatriciaSet { map: f.into() }
-    }
-}
-impl From<PatriciaSet> for Node<()> {
-    fn from(f: PatriciaSet) -> Self {
-        f.map.into()
-    }
-}
-impl AsRef<Node<()>> for PatriciaSet {
-    fn as_ref(&self) -> &Node<()> {
-        self.map.as_ref()
     }
 }
 
