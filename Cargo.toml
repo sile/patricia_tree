@@ -14,13 +14,8 @@ edition = "2021"
 [badges]
 coveralls = { repository = "sile/patricia_tree" }
 
-[features]
-binary-format = ["bytecodec", "trackable"]
-
 [dependencies]
 bitflags = "1"
-bytecodec = { version = "0.4", optional = true }
-trackable = { version = "1", optional = true }
 serde = { version = "1", optional = true }
 
 [dev-dependencies]
@@ -31,16 +26,6 @@ serde_json = { version = "1" }
 
 [package.metadata.docs.rs]
 all-features = true
-
-[[example]]
-name = "decode"
-path = "examples/decode.rs"
-required-features = ["binary-format"]
-
-[[example]]
-name = "encode"
-path = "examples/encode.rs"
-required-features = ["binary-format"]
 
 [[example]]
 name = "insert_lines"

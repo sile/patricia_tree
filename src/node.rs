@@ -28,9 +28,6 @@ bitflags! {
     }
 }
 
-#[cfg(feature = "binary-format")]
-pub use crate::codec::{NodeDecoder, NodeEncoder};
-
 const FLAGS_OFFSET: isize = 0;
 const LABEL_LEN_OFFSET: isize = 1;
 const LABEL_OFFSET: isize = 2;
@@ -162,7 +159,7 @@ impl<V> Node<V> {
         }
     }
 
-    #[cfg(any(feature = "binary-format", feature = "serde"))]
+    #[cfg(any(feature = "serde"))]
     pub(crate) fn new_for_decoding(flags: Flags, label_len: u8) -> Self {
         let mut init_flags = Flags::empty();
         let mut layout = Self::initial_layout(label_len as usize);
@@ -200,7 +197,7 @@ impl<V> Node<V> {
         }
     }
 
-    #[cfg(any(feature = "binary-format", feature = "serde"))]
+    #[cfg(any(feature = "serde"))]
     pub(crate) fn label_mut(&mut self) -> &mut [u8] {
         unsafe {
             let label_len = *self.ptr.offset(LABEL_LEN_OFFSET) as usize;
