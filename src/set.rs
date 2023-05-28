@@ -1,5 +1,6 @@
 //! A set based on a patricia tree.
 use crate::map::{self, PatriciaMap};
+#[cfg(feature = "serde")]
 use crate::node::Node;
 use std::fmt;
 use std::iter::FromIterator;
@@ -250,6 +251,18 @@ impl PatriciaSet {
     {
         self.map.iter_prefix(prefix).map(|(k, _)| k)
     }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn from_node(node: Node<()>) -> Self {
+        Self {
+            map: PatriciaMap::from_node(node),
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn as_node(&self) -> &Node<()> {
+        self.map.as_node()
+    }
 }
 impl fmt::Debug for PatriciaSet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -291,21 +304,6 @@ impl<T: AsRef<[u8]>> Extend<T> for PatriciaSet {
         for t in iter {
             self.insert(t);
         }
-    }
-}
-impl From<Node<()>> for PatriciaSet {
-    fn from(f: Node<()>) -> Self {
-        PatriciaSet { map: f.into() }
-    }
-}
-impl From<PatriciaSet> for Node<()> {
-    fn from(f: PatriciaSet) -> Self {
-        f.map.into()
-    }
-}
-impl AsRef<Node<()>> for PatriciaSet {
-    fn as_ref(&self) -> &Node<()> {
-        self.map.as_ref()
     }
 }
 

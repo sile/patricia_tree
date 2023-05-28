@@ -13,9 +13,7 @@ impl<V> PatriciaTree<V> {
             len: 0,
         }
     }
-    pub fn into_root(self) -> Node<V> {
-        self.root
-    }
+    #[cfg(feature = "serde")]
     pub fn root(&self) -> &Node<V> {
         &self.root
     }

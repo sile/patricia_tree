@@ -34,9 +34,9 @@ pub use map::PatriciaMap;
 pub use set::PatriciaSet;
 
 pub mod map;
-pub mod node;
 pub mod set;
 
+mod node;
 #[cfg(feature = "serde")]
 mod serialization;
 mod tree;

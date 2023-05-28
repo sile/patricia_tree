@@ -446,6 +446,16 @@ impl<V> PatriciaMap<V> {
             nodes: self.tree.nodes(),
         }
     }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn from_node(node: Node<V>) -> Self {
+        Self { tree: node.into() }
+    }
+
+    #[cfg(feature = "serde")]
+    pub(crate) fn as_node(&self) -> &Node<V> {
+        self.tree.root()
+    }
 }
 impl<V: fmt::Debug> fmt::Debug for PatriciaMap<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -501,21 +511,6 @@ where
         for (k, v) in iter {
             self.insert(k, v);
         }
-    }
-}
-impl<V> From<Node<V>> for PatriciaMap<V> {
-    fn from(f: Node<V>) -> Self {
-        PatriciaMap { tree: f.into() }
-    }
-}
-impl<V> From<PatriciaMap<V>> for Node<V> {
-    fn from(f: PatriciaMap<V>) -> Self {
-        f.tree.into_root()
-    }
-}
-impl<V> AsRef<Node<V>> for PatriciaMap<V> {
-    fn as_ref(&self) -> &Node<V> {
-        self.tree.root()
     }
 }
 
@@ -884,7 +879,7 @@ mod tests {
         t.insert("🌏🗻", ()); // [240,159,140,143,240,159,151,187]
         t.insert("🌏🍔", ()); // [240,159,140,143,240,159,141,148]
 
-        let first_label = t.as_ref().child().unwrap().label();
+        let first_label = t.as_node().child().unwrap().label();
         assert!(std::str::from_utf8(first_label).is_err());
         assert_eq!(first_label, [240, 159, 140, 143, 240, 159]);
 
@@ -893,7 +888,7 @@ mod tests {
         t.insert_str("🌏🗻", ());
         t.insert_str("🌏🍔", ());
 
-        let first_label = t.as_ref().child().unwrap().label();
+        let first_label = t.as_node().child().unwrap().label();
         assert_eq!(std::str::from_utf8(first_label).ok(), Some("🌏"));
     }
 

@@ -19,7 +19,7 @@ impl Serialize for PatriciaSet {
     where
         S: Serializer,
     {
-        self.as_ref().serialize(serializer)
+        self.as_node().serialize(serializer)
     }
 }
 
@@ -38,7 +38,7 @@ impl<T: Serialize> Serialize for PatriciaMap<T> {
     where
         S: Serializer,
     {
-        self.as_ref().serialize(serializer)
+        self.as_node().serialize(serializer)
     }
 }
 
@@ -86,7 +86,7 @@ impl<'de> Deserialize<'de> for PatriciaSet {
     where
         D: Deserializer<'de>,
     {
-        Node::deserialize(deserializer).map(PatriciaSet::from)
+        Node::deserialize(deserializer).map(PatriciaSet::from_node)
     }
 }
 
@@ -105,7 +105,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for PatriciaMap<T> {
     where
         D: Deserializer<'de>,
     {
-        Node::<T>::deserialize(deserializer).map(PatriciaMap::from)
+        Node::<T>::deserialize(deserializer).map(PatriciaMap::from_node)
     }
 }
 

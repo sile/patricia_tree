@@ -159,7 +159,7 @@ impl<V> Node<V> {
         }
     }
 
-    #[cfg(any(feature = "serde"))]
+    #[cfg(feature = "serde")]
     pub(crate) fn new_for_decoding(flags: Flags, label_len: u8) -> Self {
         let mut init_flags = Flags::empty();
         let mut layout = Self::initial_layout(label_len as usize);
@@ -197,7 +197,7 @@ impl<V> Node<V> {
         }
     }
 
-    #[cfg(any(feature = "serde"))]
+    #[cfg(feature = "serde")]
     pub(crate) fn label_mut(&mut self) -> &mut [u8] {
         unsafe {
             let label_len = *self.ptr.offset(LABEL_LEN_OFFSET) as usize;
@@ -947,39 +947,9 @@ pub struct NodeMut<'a, V: 'a> {
     child: Option<&'a mut Node<V>>,
 }
 impl<'a, V: 'a> NodeMut<'a, V> {
-    /// Makes a new reference to a node's label and mutable value.
-    pub fn new(
-        label: &'a [u8],
-        value: Option<&'a mut V>,
-        sibling: Option<&'a mut Node<V>>,
-        child: Option<&'a mut Node<V>>,
-    ) -> Self {
-        NodeMut {
-            label,
-            value,
-            sibling,
-            child,
-        }
-    }
-
     /// Returns the label of the node.
     pub fn label(&self) -> &'a [u8] {
         self.label
-    }
-
-    /// Returns the value of the node, if present.
-    pub fn value(&self) -> &Option<&'a mut V> {
-        &self.value
-    }
-
-    /// Returns the sibling of the node, if present.
-    pub fn sibling(&self) -> &Option<&'a mut Node<V>> {
-        &self.sibling
-    }
-
-    /// Returns the child of the node, if present.
-    pub fn child(&self) -> &Option<&'a mut Node<V>> {
-        &self.child
     }
 
     /// Converts into a mutable reference to the value.
@@ -1124,7 +1094,7 @@ mod tests {
     }
 
     fn set_to_labels(set: &PatriciaSet) -> Vec<(usize, &str)> {
-        set.as_ref()
+        set.as_node()
             .iter()
             .map(|(level, n)| (level, str::from_utf8(n.label()).unwrap()))
             .collect()
