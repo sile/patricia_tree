@@ -9,6 +9,9 @@ use std::iter::FromIterator;
 /// TODO
 pub type BytesPatriciaSet = PatriciaSet<Vec<u8>>;
 
+/// TODO
+pub type StringPatriciaSet = PatriciaSet<String>;
+
 /// A set based on a patricia tree.
 #[derive(Default, Clone)]
 pub struct PatriciaSet<T> {

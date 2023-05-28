@@ -9,6 +9,9 @@ use std::marker::PhantomData;
 /// TODO
 pub type BytesPatriciaMap<V> = PatriciaMap<Vec<u8>, V>;
 
+/// TODO
+pub type StringPatriciaMap<V> = PatriciaMap<String, V>;
+
 /// A map based on a patricia tree.
 pub struct PatriciaMap<K, V> {
     tree: PatriciaTree<V>,
@@ -546,10 +549,7 @@ impl<'a, K: Bytes, V: 'a> Iterator for Iter<'a, K, V> {
             self.key_bytes.truncate(self.key_offset + key_len);
             self.key_bytes.extend(node.label());
             if let Some(value) = node.value() {
-                return Some((
-                    K::from_borrowed(K::Borrowed::from_bytes(&self.key_bytes)),
-                    value,
-                ));
+                return Some((K::Borrowed::from_bytes(&self.key_bytes).to_owned(), value));
             }
         }
         None
@@ -570,10 +570,7 @@ impl<K: Bytes, V> Iterator for IntoIter<K, V> {
             self.key_bytes.truncate(key_len);
             self.key_bytes.extend(node.label());
             if let Some(value) = node.take_value() {
-                return Some((
-                    K::from_borrowed(K::Borrowed::from_bytes(&self.key_bytes)),
-                    value,
-                ));
+                return Some((K::Borrowed::from_bytes(&self.key_bytes).to_owned(), value));
             }
         }
         None
@@ -603,10 +600,7 @@ impl<'a, K: Bytes, V: 'a> Iterator for IterMut<'a, K, V> {
             self.key_bytes.truncate(key_len);
             self.key_bytes.extend(node.label());
             if let Some(value) = node.into_value_mut() {
-                return Some((
-                    K::from_borrowed(K::Borrowed::from_bytes(&self.key_bytes)),
-                    value,
-                ));
+                return Some((K::Borrowed::from_bytes(&self.key_bytes).to_owned(), value));
             }
         }
         None
@@ -896,26 +890,25 @@ mod tests {
         assert!(vec![0 as u16, 1, 2].into_iter().eq(results.into_iter()));
     }
 
-    // TODO
-    // #[test]
-    // fn utf8_keys_works() {
-    //     // Insert as bytes.
-    //     let mut t = BytesPatriciaMap::new();
-    //     t.insert("🌏🗻", ()); // [240,159,140,143,240,159,151,187]
-    //     t.insert("🌏🍔", ()); // [240,159,140,143,240,159,141,148]
+    #[test]
+    fn string_patricia_map_works() {
+        // Insert as bytes.
+        let mut t = BytesPatriciaMap::new();
+        t.insert("🌏🗻", ()); // [240,159,140,143,240,159,151,187]
+        t.insert("🌏🍔", ()); // [240,159,140,143,240,159,141,148]
 
-    //     let first_label = t.as_node().child().unwrap().label();
-    //     assert!(std::str::from_utf8(first_label).is_err());
-    //     assert_eq!(first_label, [240, 159, 140, 143, 240, 159]);
+        let first_label = t.as_node().child().unwrap().label();
+        assert!(std::str::from_utf8(first_label).is_err());
+        assert_eq!(first_label, [240, 159, 140, 143, 240, 159]);
 
-    //     // Insert as string.
-    //     let mut t = BytesPatriciaMap::new();
-    //     t.insert_str("🌏🗻", ());
-    //     t.insert_str("🌏🍔", ());
+        // Insert as string.
+        let mut t = StringPatriciaMap::new();
+        t.insert("🌏🗻", ());
+        t.insert("🌏🍔", ());
 
-    //     let first_label = t.as_node().child().unwrap().label();
-    //     assert_eq!(std::str::from_utf8(first_label).ok(), Some("🌏"));
-    // }
+        let first_label = t.as_node().child().unwrap().label();
+        assert_eq!(std::str::from_utf8(first_label).ok(), Some("🌏"));
+    }
 
     #[test]
     fn issue21() {

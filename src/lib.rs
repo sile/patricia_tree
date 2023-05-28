@@ -30,8 +30,8 @@ extern crate bitflags;
 #[cfg(test)]
 extern crate rand;
 
-pub use map::{BytesPatriciaMap, PatriciaMap};
-pub use set::{BytesPatriciaSet, PatriciaSet};
+pub use map::{BytesPatriciaMap, PatriciaMap, StringPatriciaMap};
+pub use set::{BytesPatriciaSet, PatriciaSet, StringPatriciaSet};
 
 pub mod map;
 pub mod set;
@@ -44,18 +44,15 @@ mod tree;
 /// TODO
 pub trait Bytes {
     /// TODO
-    type Borrowed: ?Sized + BorrowedBytes;
-
-    /// TODO
-    fn from_borrowed(bytes: &Self::Borrowed) -> Self;
+    type Borrowed: ?Sized + BorrowedBytes + ToOwned<Owned = Self>;
 }
 
 impl Bytes for Vec<u8> {
     type Borrowed = [u8];
+}
 
-    fn from_borrowed(bytes: &[u8]) -> Self {
-        bytes.to_owned()
-    }
+impl Bytes for String {
+    type Borrowed = str;
 }
 
 /// TODO
@@ -96,60 +93,29 @@ impl BorrowedBytes for [u8] {
     }
 }
 
-// pub(crate) fn insert_str(&mut self, key: &str, value: V) -> Option<V> {
-//     if self.label().get(0) > key.as_bytes().get(0) {
-//         let this = Node {
-//             ptr: self.ptr,
-//             _value: PhantomData,
-//         };
-//         let node = Node::new(key.as_bytes(), Some(value), None, Some(this));
-//         self.ptr = node.ptr;
-//         mem::forget(node);
-//         return None;
-//     }
+impl BorrowedBytes for str {
+    fn as_bytes(&self) -> &[u8] {
+        self.as_bytes()
+    }
 
-//     let common_prefix_len = self.skip_str_common_prefix(key);
-//     let next = &key[common_prefix_len..];
-//     let is_label_matched = common_prefix_len == self.label().len();
-//     if next.is_empty() {
-//         if is_label_matched {
-//             let old = self.take_value();
-//             self.set_value(value);
-//             old
-//         } else {
-//             self.split_at(common_prefix_len);
-//             self.set_value(value);
-//             None
-//         }
-//     } else if is_label_matched {
-//         if let Some(child) = self.child_mut() {
-//             return child.insert_str(next, value);
-//         }
-//         let child = Node::new(next.as_bytes(), Some(value), None, None);
-//         self.set_child(child);
-//         None
-//     } else if common_prefix_len == 0 {
-//         if let Some(sibling) = self.sibling_mut() {
-//             return sibling.insert_str(next, value);
-//         }
-//         let sibling = Node::new(next.as_bytes(), Some(value), None, None);
-//         self.set_sibling(sibling);
-//         None
-//     } else {
-//         self.split_at(common_prefix_len);
-//         assert_some!(self.child_mut()).insert_str(next, value);
-//         None
-//     }
-// }
-// fn skip_str_common_prefix(&self, key: &str) -> usize {
-//     for (i, c) in key.char_indices() {
-//         let n = c.len_utf8();
-//         if key.as_bytes()[i..i + n]
-//             .iter()
-//             .ne(self.label()[i..].iter().take(n))
-//         {
-//             return i;
-//         }
-//     }
-//     key.len()
-// }
+    fn is_valid_bytes(bytes: &[u8]) -> bool {
+        std::str::from_utf8(bytes).is_ok()
+    }
+
+    fn from_bytes(bytes: &[u8]) -> &Self {
+        std::str::from_utf8(bytes).expect("unreachable")
+    }
+
+    fn strip_common_prefix(&self, bytes: &[u8]) -> &Self {
+        for (i, c) in self.char_indices() {
+            let n = c.len_utf8();
+            if self.as_bytes()[i..i + n]
+                .iter()
+                .ne(bytes[i..].iter().take(n))
+            {
+                return &self[i..];
+            }
+        }
+        ""
+    }
+}
