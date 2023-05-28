@@ -10,9 +10,9 @@
 //! # Examples
 //!
 //! ```
-//! use patricia_tree::BytesPatriciaMap;
+//! use patricia_tree::PatriciaMap;
 //!
-//! let mut map = BytesPatriciaMap::new();
+//! let mut map = PatriciaMap::new();
 //! map.insert("foo", 1);
 //! map.insert("bar", 2);
 //! map.insert("baz", 3);
@@ -30,8 +30,8 @@ extern crate bitflags;
 #[cfg(test)]
 extern crate rand;
 
-pub use map::{BytesPatriciaMap, PatriciaMap, StringPatriciaMap};
-pub use set::{BytesPatriciaSet, PatriciaSet, StringPatriciaSet};
+pub use map::{GenericPatriciaMap, PatriciaMap, StringPatriciaMap};
+pub use set::{GenericPatriciaSet, PatriciaSet, StringPatriciaSet};
 
 pub mod map;
 pub mod set;

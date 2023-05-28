@@ -895,7 +895,7 @@ impl<V> Iterator for IntoIter<V> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BytesPatriciaSet;
+    use crate::PatriciaSet;
     use std::str;
 
     #[test]
@@ -934,7 +934,7 @@ mod tests {
 
     #[test]
     fn ietr_works() {
-        let mut set = BytesPatriciaSet::new();
+        let mut set = PatriciaSet::new();
         set.insert("foo");
         set.insert("bar");
         set.insert("baz");
@@ -958,7 +958,7 @@ mod tests {
 
     #[test]
     fn iter_mut_works() {
-        let mut set = BytesPatriciaSet::new();
+        let mut set = PatriciaSet::new();
         set.insert("foo");
         set.insert("bar");
         set.insert("baz");
@@ -996,7 +996,7 @@ mod tests {
     fn reclaim_works() {
         let mut set = ["123", "123456", "123abc", "123def"]
             .iter()
-            .collect::<BytesPatriciaSet>();
+            .collect::<PatriciaSet>();
         assert_eq!(
             set_to_labels(&set),
             [(0, ""), (1, "123"), (2, "456"), (2, "abc"), (2, "def")]
@@ -1019,7 +1019,7 @@ mod tests {
     fn get_longest_common_prefix_works() {
         let set = ["123", "123456", "1234_67", "123abc", "123def"]
             .iter()
-            .collect::<BytesPatriciaSet>();
+            .collect::<PatriciaSet>();
 
         let lcp = |key| set.get_longest_common_prefix(key);
         assert_eq!(lcp(""), None);
@@ -1031,7 +1031,7 @@ mod tests {
         assert_eq!(lcp("123456789"), Some("123456".as_bytes()));
     }
 
-    fn set_to_labels(set: &BytesPatriciaSet) -> Vec<(usize, &str)> {
+    fn set_to_labels(set: &PatriciaSet) -> Vec<(usize, &str)> {
         set.as_node()
             .iter()
             .map(|(level, n)| (level, str::from_utf8(n.label()).unwrap()))
