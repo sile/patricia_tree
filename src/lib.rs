@@ -10,9 +10,9 @@
 //! # Examples
 //!
 //! ```
-//! use patricia_tree::PatriciaMap;
+//! use patricia_tree::BytesPatriciaMap;
 //!
-//! let mut map = PatriciaMap::new();
+//! let mut map = BytesPatriciaMap::new();
 //! map.insert("foo", 1);
 //! map.insert("bar", 2);
 //! map.insert("baz", 3);
@@ -44,6 +44,23 @@ mod tree;
 /// TODO
 pub trait Bytes {
     /// TODO
+    type Borrowed: ?Sized + BorrowedBytes;
+
+    /// TODO
+    fn from_borrowed(bytes: &Self::Borrowed) -> Self;
+}
+
+impl Bytes for Vec<u8> {
+    type Borrowed = [u8];
+
+    fn from_borrowed(bytes: &[u8]) -> Self {
+        bytes.to_owned()
+    }
+}
+
+/// TODO
+pub trait BorrowedBytes {
+    /// TODO
     fn as_bytes(&self) -> &[u8];
 
     /// TODO
@@ -56,7 +73,7 @@ pub trait Bytes {
     fn strip_common_prefix(&self, bytes: &[u8]) -> &Self;
 }
 
-impl Bytes for [u8] {
+impl BorrowedBytes for [u8] {
     fn as_bytes(&self) -> &[u8] {
         self
     }

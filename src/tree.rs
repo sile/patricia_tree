@@ -1,6 +1,6 @@
 use crate::{
     node::{self, Node, NodeMut},
-    Bytes,
+    BorrowedBytes,
 };
 
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ impl<V> PatriciaTree<V> {
     pub fn into_root(self) -> Node<V> {
         self.root
     }
-    pub fn insert<K: ?Sized + Bytes>(&mut self, key: &K, value: V) -> Option<V> {
+    pub fn insert<K: ?Sized + BorrowedBytes>(&mut self, key: &K, value: V) -> Option<V> {
         if let Some(old) = self.root.insert(key, value) {
             Some(old)
         } else {

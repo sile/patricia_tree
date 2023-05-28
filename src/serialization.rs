@@ -4,7 +4,7 @@ use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::{Borrow, Cow};
 
-impl<T: ?Sized> Serialize for PatriciaSet<T> {
+impl<T> Serialize for PatriciaSet<T> {
     /// In order to serialize a [PatriciaSet], make sure you installed the crate
     /// with the feature `serde`.
     ///
@@ -23,7 +23,7 @@ impl<T: ?Sized> Serialize for PatriciaSet<T> {
     }
 }
 
-impl<K: ?Sized, V: Serialize> Serialize for PatriciaMap<K, V> {
+impl<K, V: Serialize> Serialize for PatriciaMap<K, V> {
     /// In order to serialize a [PatriciaMap], make sure you installed the crate
     /// with the feature `serde`.
     ///
@@ -72,7 +72,7 @@ impl<T: Serialize> Serialize for Node<T> {
 }
 
 // TODO
-impl<'de, T: ?Sized> Deserialize<'de> for PatriciaSet<T> {
+impl<'de, T> Deserialize<'de> for PatriciaSet<T> {
     /// In order to deserialize a [PatriciaSet], make sure you installed the crate
     /// with the feature `serde`.
     ///
@@ -92,7 +92,7 @@ impl<'de, T: ?Sized> Deserialize<'de> for PatriciaSet<T> {
 }
 
 // TODO
-impl<'de, K: ?Sized, V: Deserialize<'de>> Deserialize<'de> for PatriciaMap<K, V> {
+impl<'de, K, V: Deserialize<'de>> Deserialize<'de> for PatriciaMap<K, V> {
     /// In order to serialize a [PatriciaMap], make sure you installed the crate
     /// with the feature `serde`.
     ///

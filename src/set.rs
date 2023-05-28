@@ -7,23 +7,23 @@ use std::fmt;
 use std::iter::FromIterator;
 
 /// TODO
-pub type BytesPatriciaSet = PatriciaSet<[u8]>;
+pub type BytesPatriciaSet = PatriciaSet<Vec<u8>>;
 
 /// A set based on a patricia tree.
 #[derive(Default, Clone)]
-pub struct PatriciaSet<T: ?Sized> {
+pub struct PatriciaSet<T> {
     map: PatriciaMap<T, ()>,
 }
 
-impl<T: ?Sized> PatriciaSet<T> {
+impl<T> PatriciaSet<T> {
     /// Makes a new empty `PatriciaSet` instance.
     ///
     /// # Examples
     ///
     /// ```
-    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::BytesPatriciaSet;
     ///
-    /// let set = PatriciaSet::new();
+    /// let set = BytesPatriciaSet::new();
     /// assert!(set.is_empty());
     /// ```
     pub fn new() -> Self {
@@ -37,9 +37,9 @@ impl<T: ?Sized> PatriciaSet<T> {
     /// # Examples
     ///
     /// ```
-    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::BytesPatriciaSet;
     ///
-    /// let mut set = PatriciaSet::new();
+    /// let mut set = BytesPatriciaSet::new();
     /// set.insert("foo");
     /// set.insert("bar");
     /// assert_eq!(set.len(), 2);
@@ -53,9 +53,9 @@ impl<T: ?Sized> PatriciaSet<T> {
     /// # Examples
     ///
     /// ```
-    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::BytesPatriciaSet;
     ///
-    /// let mut set = PatriciaSet::new();
+    /// let mut set = BytesPatriciaSet::new();
     /// assert!(set.is_empty());
     ///
     /// set.insert("foo");
@@ -73,9 +73,9 @@ impl<T: ?Sized> PatriciaSet<T> {
     /// # Examples
     ///
     /// ```
-    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::BytesPatriciaSet;
     ///
-    /// let mut set = PatriciaSet::new();
+    /// let mut set = BytesPatriciaSet::new();
     /// set.insert("foo");
     /// set.clear();
     /// assert!(set.is_empty());
@@ -101,20 +101,20 @@ impl<T: ?Sized> PatriciaSet<T> {
         self.map.into_node()
     }
 }
-impl<T: ?Sized + Bytes> PatriciaSet<T> {
+impl<T: Bytes> PatriciaSet<T> {
     /// Returns `true` if this set contains a value.
     ///
     /// # Examples
     ///
     /// ```
-    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::BytesPatriciaSet;
     ///
-    /// let mut set = PatriciaSet::new();
+    /// let mut set = BytesPatriciaSet::new();
     /// set.insert("foo");
     /// assert!(set.contains("foo"));
     /// assert!(!set.contains("bar"));
     /// ```
-    pub fn contains<U: AsRef<T>>(&self, value: U) -> bool {
+    pub fn contains<U: AsRef<T::Borrowed>>(&self, value: U) -> bool {
         self.map.get(value).is_some()
     }
 
@@ -123,9 +123,10 @@ impl<T: ?Sized + Bytes> PatriciaSet<T> {
     /// # Examples
     ///
     /// ```
-    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::BytesPatriciaSet;
     ///
-    /// let mut set = PatriciaSet::new();
+    /// let mut set = BytesPatriciaSet::new();
+    ///
     /// set.insert("foo");
     /// set.insert("foobar");
     /// assert_eq!(set.get_longest_common_prefix("fo"), None);
@@ -134,9 +135,9 @@ impl<T: ?Sized + Bytes> PatriciaSet<T> {
     /// assert_eq!(set.get_longest_common_prefix("foobar"), Some("foobar".as_bytes()));
     /// assert_eq!(set.get_longest_common_prefix("foobarbaz"), Some("foobar".as_bytes()));
     /// ```
-    pub fn get_longest_common_prefix<'a, U>(&self, value: &'a U) -> Option<&'a T>
+    pub fn get_longest_common_prefix<'a, U>(&self, value: &'a U) -> Option<&'a T::Borrowed>
     where
-        U: AsRef<T> + ?Sized,
+        U: ?Sized + AsRef<T::Borrowed>,
     {
         self.map.get_longest_common_prefix(value).map(|x| x.0)
     }
@@ -149,14 +150,14 @@ impl<T: ?Sized + Bytes> PatriciaSet<T> {
     /// # Examples
     ///
     /// ```
-    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::BytesPatriciaSet;
     ///
-    /// let mut set = PatriciaSet::new();
+    /// let mut set = BytesPatriciaSet::new();
     /// assert!(set.insert("foo"));
     /// assert!(!set.insert("foo"));
     /// assert_eq!(set.len(), 1);
     /// ```
-    pub fn insert<U: AsRef<T>>(&mut self, value: U) -> bool {
+    pub fn insert<U: AsRef<T::Borrowed>>(&mut self, value: U) -> bool {
         self.map.insert(value, ()).is_none()
     }
 
@@ -165,14 +166,14 @@ impl<T: ?Sized + Bytes> PatriciaSet<T> {
     /// # Examples
     ///
     /// ```
-    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::BytesPatriciaSet;
     ///
-    /// let mut set = PatriciaSet::new();
+    /// let mut set = BytesPatriciaSet::new();
     /// set.insert("foo");
     /// assert_eq!(set.remove("foo"), true);
     /// assert_eq!(set.remove("foo"), false);
     /// ```
-    pub fn remove<U: AsRef<T>>(&mut self, value: U) -> bool {
+    pub fn remove<U: AsRef<T::Borrowed>>(&mut self, value: U) -> bool {
         self.map.remove(value).is_some()
     }
 
@@ -183,9 +184,9 @@ impl<T: ?Sized + Bytes> PatriciaSet<T> {
     /// # Examples
     ///
     /// ```
-    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::BytesPatriciaSet;
     ///
-    /// let mut a = PatriciaSet::new();
+    /// let mut a = BytesPatriciaSet::new();
     /// a.insert("rust");
     /// a.insert("ruby");
     /// a.insert("python");
@@ -196,7 +197,7 @@ impl<T: ?Sized + Bytes> PatriciaSet<T> {
     /// assert_eq!(a.iter().collect::<Vec<_>>(), [b"erlang", b"python"]);
     /// assert_eq!(b.iter().collect::<Vec<_>>(), [b"ruby", b"rust"]);
     /// ```
-    pub fn split_by_prefix<U: AsRef<T>>(&mut self, prefix: U) -> Self {
+    pub fn split_by_prefix<U: AsRef<T::Borrowed>>(&mut self, prefix: U) -> Self {
         PatriciaSet {
             map: self.map.split_by_prefix(prefix),
         }
@@ -207,9 +208,9 @@ impl<T: ?Sized + Bytes> PatriciaSet<T> {
     /// # Examples
     ///
     /// ```
-    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::BytesPatriciaSet;
     ///
-    /// let mut set = PatriciaSet::new();
+    /// let mut set = BytesPatriciaSet::new();
     /// set.insert("foo");
     /// set.insert("bar");
     /// set.insert("baz");
@@ -220,33 +221,29 @@ impl<T: ?Sized + Bytes> PatriciaSet<T> {
         Iter(self.map.keys())
     }
 }
-impl<T: ?Sized + Bytes + ToOwned> PatriciaSet<T> {
+impl<T: Bytes> PatriciaSet<T> {
     /// Gets an iterator over the contents having the given prefix of this set, in sorted order.
     ///
     /// # Examples
     ///
     /// ```
-    /// use patricia_tree::PatriciaSet;
+    /// use patricia_tree::BytesPatriciaSet;
     ///
-    /// let mut set = PatriciaSet::new();
+    /// let mut set = BytesPatriciaSet::new();
     /// set.insert("foo");
     /// set.insert("bar");
     /// set.insert("baz");
     ///
     /// assert_eq!(set.iter_prefix(b"ba").collect::<Vec<_>>(), [Vec::from("bar"), "baz".into()]);
     /// ```
-    pub fn iter_prefix<'a, 'b>(&'a self, prefix: &'b T) -> impl 'a + Iterator<Item = T::Owned>
+    pub fn iter_prefix<'a, 'b>(&'a self, prefix: &'b T::Borrowed) -> impl 'a + Iterator<Item = T>
     where
         'b: 'a,
     {
         self.map.iter_prefix(prefix).map(|(k, _)| k)
     }
 }
-impl<T> fmt::Debug for PatriciaSet<T>
-where
-    T: ?Sized + Bytes + ToOwned,
-    T::Owned: fmt::Debug,
-{
+impl<T: Bytes + fmt::Debug> fmt::Debug for PatriciaSet<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{")?;
         for (i, t) in self.iter().enumerate() {
@@ -259,14 +256,14 @@ where
         Ok(())
     }
 }
-impl<T: ?Sized + Bytes + ToOwned> IntoIterator for PatriciaSet<T> {
-    type Item = T::Owned;
+impl<T: Bytes> IntoIterator for PatriciaSet<T> {
+    type Item = T;
     type IntoIter = IntoIter<T>;
     fn into_iter(self) -> Self::IntoIter {
         IntoIter(self.map.into_iter())
     }
 }
-impl<T: ?Sized + Bytes + ToOwned, U: AsRef<T>> FromIterator<U> for PatriciaSet<T> {
+impl<T: Bytes, U: AsRef<T::Borrowed>> FromIterator<U> for PatriciaSet<T> {
     fn from_iter<I>(iter: I) -> Self
     where
         I: IntoIterator<Item = U>,
@@ -278,7 +275,7 @@ impl<T: ?Sized + Bytes + ToOwned, U: AsRef<T>> FromIterator<U> for PatriciaSet<T
         set
     }
 }
-impl<T: Bytes + ToOwned, U: AsRef<T>> Extend<U> for PatriciaSet<T> {
+impl<T: Bytes, U: AsRef<T::Borrowed>> Extend<U> for PatriciaSet<T> {
     fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = U>,
@@ -291,9 +288,9 @@ impl<T: Bytes + ToOwned, U: AsRef<T>> Extend<U> for PatriciaSet<T> {
 
 /// An Iterator over a `PatriciaSet`'s items.
 #[derive(Debug)]
-pub struct Iter<'a, T: ?Sized>(map::Keys<'a, T, ()>);
-impl<'a, T: ?Sized + Bytes + ToOwned> Iterator for Iter<'a, T> {
-    type Item = T::Owned;
+pub struct Iter<'a, T>(map::Keys<'a, T, ()>);
+impl<'a, T: Bytes> Iterator for Iter<'a, T> {
+    type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
@@ -301,9 +298,9 @@ impl<'a, T: ?Sized + Bytes + ToOwned> Iterator for Iter<'a, T> {
 
 /// An owning iterator over a `PatriciaSet`'s items.
 #[derive(Debug)]
-pub struct IntoIter<T: ?Sized>(map::IntoIter<T, ()>);
-impl<T: ?Sized + Bytes + ToOwned> Iterator for IntoIter<T> {
-    type Item = T::Owned;
+pub struct IntoIter<T>(map::IntoIter<T, ()>);
+impl<T: Bytes> Iterator for IntoIter<T> {
+    type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(|(k, _)| k)
     }

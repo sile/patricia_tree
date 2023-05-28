@@ -1,5 +1,5 @@
 //! A node which represents a subtree of a patricia tree.
-use crate::Bytes;
+use crate::BorrowedBytes;
 use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
 use std::marker::PhantomData;
 use std::mem;
@@ -557,7 +557,7 @@ impl<V> Node<V> {
             None
         }
     }
-    pub(crate) fn insert<K: ?Sized + Bytes>(&mut self, key: &K, value: V) -> Option<V> {
+    pub(crate) fn insert<K: ?Sized + BorrowedBytes>(&mut self, key: &K, value: V) -> Option<V> {
         if self.label().first() > key.as_bytes().first() {
             let this = Node {
                 ptr: self.ptr,
