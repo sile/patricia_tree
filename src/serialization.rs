@@ -1,8 +1,9 @@
 use crate::node::{Flags, Node};
-use crate::{PatriciaMap, PatriciaSet};
+use crate::{BorrowedBytes, PatriciaMap, PatriciaSet};
 use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::{Borrow, Cow};
+use std::marker::PhantomData;
 
 impl<T> Serialize for PatriciaSet<T> {
     /// In order to serialize a [PatriciaSet], make sure you installed the crate
@@ -11,7 +12,7 @@ impl<T> Serialize for PatriciaSet<T> {
     /// For example, in your `Cargo.toml`:
     /// ```toml
     /// [dependencies]
-    /// patricia_tree = { version = "0.5.5", features = ["serde"] }
+    /// patricia_tree = { version = "*", features = ["serde"] }
     /// ```
     ///
     /// Read more about serialization / deserialization at the [serde] crate.
@@ -30,7 +31,7 @@ impl<K, V: Serialize> Serialize for PatriciaMap<K, V> {
     /// For example, in your `Cargo.toml`:
     /// ```toml
     /// [dependencies]
-    /// patricia_tree = { version = "0.5.5", features = ["serde"] }
+    /// patricia_tree = { version = "*", features = ["serde"] }
     /// ```
     ///
     /// Read more about serialization / deserialization at the [serde] crate.
@@ -71,15 +72,14 @@ impl<T: Serialize> Serialize for Node<T> {
     }
 }
 
-// TODO
-impl<'de, T> Deserialize<'de> for PatriciaSet<T> {
+impl<'de, T: crate::Bytes> Deserialize<'de> for PatriciaSet<T> {
     /// In order to deserialize a [PatriciaSet], make sure you installed the crate
     /// with the feature `serde`.
     ///
     /// For example, in your `Cargo.toml`:
     /// ```toml
     /// [dependencies]
-    /// patricia_tree = { version = "0.5.5", features = ["serde"] }
+    /// patricia_tree = { version = "*", features = ["serde"] }
     /// ```
     ///
     /// Read more about serialization / deserialization at the [serde] crate.
@@ -87,19 +87,18 @@ impl<'de, T> Deserialize<'de> for PatriciaSet<T> {
     where
         D: Deserializer<'de>,
     {
-        Node::deserialize(deserializer).map(PatriciaSet::from_node)
+        KeyAndNode::<T, ()>::deserialize(deserializer).map(|x| PatriciaSet::from_node(x.node))
     }
 }
 
-// TODO
-impl<'de, K, V: Deserialize<'de>> Deserialize<'de> for PatriciaMap<K, V> {
+impl<'de, K: crate::Bytes, V: Deserialize<'de>> Deserialize<'de> for PatriciaMap<K, V> {
     /// In order to serialize a [PatriciaMap], make sure you installed the crate
     /// with the feature `serde`.
     ///
     /// For example, in your `Cargo.toml`:
     /// ```toml
     /// [dependencies]
-    /// patricia_tree = { version = "0.5.5", features = ["serde"] }
+    /// patricia_tree = { version = "*", features = ["serde"] }
     /// ```
     ///
     /// Read more about serialization / deserialization at the [serde] crate.
@@ -107,16 +106,22 @@ impl<'de, K, V: Deserialize<'de>> Deserialize<'de> for PatriciaMap<K, V> {
     where
         D: Deserializer<'de>,
     {
-        Node::<V>::deserialize(deserializer).map(PatriciaMap::from_node)
+        KeyAndNode::<K, V>::deserialize(deserializer).map(|x| PatriciaMap::from_node(x.node))
     }
 }
 
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for Node<T> {
+#[derive(Debug)]
+struct KeyAndNode<K, V> {
+    node: Node<V>,
+    _key: PhantomData<K>,
+}
+
+impl<'de, K: crate::Bytes, V: Deserialize<'de>> Deserialize<'de> for KeyAndNode<K, V> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let (tree_bytes, mut values): (Bytes<'de>, Vec<T>) =
+        let (tree_bytes, mut values): (Bytes<'de>, Vec<V>) =
             Deserialize::deserialize(deserializer)?;
         values.reverse();
         let mut tree_bytes = tree_bytes.0.as_ref();
@@ -134,8 +139,14 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Node<T> {
             if tree_bytes.len() < label_len {
                 return Err(D::Error::custom("unexpected EOS"));
             }
-            let mut node = Node::<T>::new_for_decoding(flags, label_len as u8);
+            let mut node = Node::<V>::new_for_decoding(flags, label_len as u8);
             node.label_mut().copy_from_slice(&tree_bytes[..label_len]);
+            if !K::Borrowed::is_valid_bytes(node.label()) {
+                return Err(D::Error::custom(&format!(
+                    "malformed label bytes: {:?}",
+                    node.label()
+                )));
+            }
             tree_bytes = &tree_bytes[label_len..];
 
             if flags.contains(Flags::VALUE_INITIALIZED) {
@@ -166,7 +177,10 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Node<T> {
                         return Err(D::Error::custom("invalid data"));
                     }
                 } else if level == 0 {
-                    return Ok(node);
+                    return Ok(KeyAndNode {
+                        node,
+                        _key: PhantomData,
+                    });
                 } else {
                     return Err(D::Error::custom("invalid data"));
                 }
