@@ -43,7 +43,10 @@ impl<V> PatriciaTree<V> {
             .get_longest_common_prefix(key, 0)
             .map(|(n, v)| (&key[..n], v))
     }
-    pub fn get_longest_common_prefix_mut<'a>(&mut self, key: &'a [u8]) -> Option<(&'a [u8], &mut V)> {
+    pub fn get_longest_common_prefix_mut<'a>(
+        &mut self,
+        key: &'a [u8],
+    ) -> Option<(&'a [u8], &mut V)> {
         self.root
             .get_longest_common_prefix_mut(key, 0)
             .map(|(n, v)| (&key[..n], v))

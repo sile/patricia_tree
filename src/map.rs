@@ -208,9 +208,12 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// *map.get_longest_common_prefix_mut("foobar").unwrap().1 = 4;
     /// assert_eq!(map.get_longest_common_prefix_mut("foobarbaz"), Some(("foobar".as_bytes(), &mut 4)));
     /// ```
-    pub fn get_longest_common_prefix_mut<'a, Q>(&mut self, key: &'a Q) -> Option<(&'a K::Borrowed, &mut V)>
-        where
-            Q: ?Sized + AsRef<K::Borrowed>,
+    pub fn get_longest_common_prefix_mut<'a, Q>(
+        &mut self,
+        key: &'a Q,
+    ) -> Option<(&'a K::Borrowed, &mut V)>
+    where
+        Q: ?Sized + AsRef<K::Borrowed>,
     {
         let (key, value) = self
             .tree

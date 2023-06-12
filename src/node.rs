@@ -1058,21 +1058,42 @@ mod tests {
 
     #[test]
     fn get_longest_common_prefix_mut_works() {
-        let mut map = [("123", 1), ("123456", 2), ("1234_67", 3), ("123abc", 4), ("123def", 5)]
-            .iter()
-            .cloned()
-            .map(|(k, v)| (String::from(k), v))
-            .collect::<StringPatriciaMap<usize>>();
+        let mut map = [
+            ("123", 1),
+            ("123456", 2),
+            ("1234_67", 3),
+            ("123abc", 4),
+            ("123def", 5),
+        ]
+        .iter()
+        .cloned()
+        .map(|(k, v)| (String::from(k), v))
+        .collect::<StringPatriciaMap<usize>>();
 
         assert_eq!(map.get_longest_common_prefix_mut(""), None);
         assert_eq!(map.get_longest_common_prefix_mut("12"), None);
-        assert_eq!(map.get_longest_common_prefix_mut("123"), Some(("123", &mut 1)));
+        assert_eq!(
+            map.get_longest_common_prefix_mut("123"),
+            Some(("123", &mut 1))
+        );
         *map.get_longest_common_prefix_mut("123").unwrap().1 = 10;
-        assert_eq!(map.get_longest_common_prefix_mut("1234"), Some(("123", &mut 10)));
-        assert_eq!(map.get_longest_common_prefix_mut("123456"), Some(("123456", &mut 2)));
+        assert_eq!(
+            map.get_longest_common_prefix_mut("1234"),
+            Some(("123", &mut 10))
+        );
+        assert_eq!(
+            map.get_longest_common_prefix_mut("123456"),
+            Some(("123456", &mut 2))
+        );
         *map.get_longest_common_prefix_mut("1234567").unwrap().1 = 20;
-        assert_eq!(map.get_longest_common_prefix_mut("1234_6"), Some(("123", &mut 10)));
-        assert_eq!(map.get_longest_common_prefix_mut("123456789"), Some(("123456", &mut 20)));
+        assert_eq!(
+            map.get_longest_common_prefix_mut("1234_6"),
+            Some(("123", &mut 10))
+        );
+        assert_eq!(
+            map.get_longest_common_prefix_mut("123456789"),
+            Some(("123456", &mut 20))
+        );
     }
 
     fn set_to_labels(set: &PatriciaSet) -> Vec<(usize, &str)> {
