@@ -190,7 +190,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     }
 
     /// Finds the longest common prefix of `key` and the keys in this map,
-    /// and returns a reference to the entry whose key matches the prefix.
+    /// and returns a mutable reference to the entry whose key matches the prefix.
     ///
     /// # Examples
     ///
