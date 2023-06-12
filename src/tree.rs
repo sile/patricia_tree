@@ -43,6 +43,11 @@ impl<V> PatriciaTree<V> {
             .get_longest_common_prefix(key, 0)
             .map(|(n, v)| (&key[..n], v))
     }
+    pub fn get_longest_common_prefix_mut<'a>(&mut self, key: &'a [u8]) -> Option<(&'a [u8], &mut V)> {
+        self.root
+            .get_longest_common_prefix_mut(key, 0)
+            .map(|(n, v)| (&key[..n], v))
+    }
     pub fn iter_prefix<'a, 'b>(&'a self, prefix: &'b [u8]) -> Option<(usize, Nodes<V>)> {
         if let Some((common_prefix_len, node)) = self.root.get_prefix_node(prefix, 0) {
             let nodes = Nodes {
