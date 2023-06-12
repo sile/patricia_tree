@@ -23,7 +23,7 @@
 //! assert_eq!(map.get("baz"), Some(&3));
 //! ```
 #![warn(missing_docs)]
-#![allow(clippy::cast_ptr_alignment, clippy::cast_ref_to_mut)]
+#![allow(clippy::cast_ptr_alignment)]
 
 #[macro_use]
 extern crate bitflags;

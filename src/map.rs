@@ -1,5 +1,7 @@
 //! A map based on a patricia tree.
-use crate::node::{self, Node};
+use crate::node;
+#[cfg(feature = "serde")]
+use crate::node::Node;
 use crate::tree::{self, PatriciaTree};
 use crate::{BorrowedBytes, Bytes};
 use std::fmt;
@@ -428,7 +430,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// ```
     pub fn values_mut(&mut self) -> ValuesMut<V> {
         ValuesMut {
-            nodes: self.tree.nodes(),
+            nodes: self.tree.nodes_mut(),
         }
     }
 }
@@ -669,15 +671,13 @@ impl<'a, V: 'a> Iterator for Values<'a, V> {
 /// A mutable iterator over a `PatriciaMap`'s values.
 #[derive(Debug)]
 pub struct ValuesMut<'a, V: 'a> {
-    nodes: tree::Nodes<'a, V>,
+    nodes: tree::NodesMut<'a, V>,
 }
 impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
     type Item = &'a mut V;
-    #[allow(mutable_transmutes)]
     fn next(&mut self) -> Option<Self::Item> {
         for (_, node) in &mut self.nodes {
-            let node = unsafe { &mut *(node as *const _ as *mut Node<V>) };
-            if let Some(value) = node.value_mut() {
+            if let Some(value) = node.into_value_mut() {
                 return Some(value);
             }
         }
