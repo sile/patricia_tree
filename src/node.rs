@@ -435,6 +435,7 @@ impl<V> Node<V> {
             None
         }
     }
+
     pub(crate) fn get_longest_common_prefix(
         &self,
         key: &[u8],
@@ -454,6 +455,30 @@ impl<V> Node<V> {
         } else if common_prefix_len == 0 && self.label().first() <= key.first() {
             self.sibling()
                 .and_then(|sibling| sibling.get_longest_common_prefix(next, offset))
+        } else {
+            None
+        }
+    }
+    pub(crate) fn get_longest_common_prefix_mut(
+        &mut self,
+        key: &[u8],
+        offset: usize,
+    ) -> Option<(usize, &mut V)> {
+        let common_prefix_len = self.skip_common_prefix(key);
+        let next = &key[common_prefix_len..];
+        if common_prefix_len == self.label().len() {
+            let offset = offset + common_prefix_len;
+            if next.is_empty() {
+                self.value_mut().map(|v| (offset, v))
+            } else {
+                let this = self.as_mut();
+                this.child
+                    .and_then(|child| child.get_longest_common_prefix_mut(next, offset))
+                    .or_else(|| this.value.map(|v| (offset, v)))
+            }
+        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
+            self.sibling_mut()
+                .and_then(|sibling| sibling.get_longest_common_prefix_mut(next, offset))
         } else {
             None
         }
@@ -895,7 +920,7 @@ impl<V> Iterator for IntoIter<V> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::PatriciaSet;
+    use crate::{PatriciaSet, StringPatriciaMap};
     use std::str;
 
     #[test]
@@ -1029,6 +1054,25 @@ mod tests {
         assert_eq!(lcp("123456"), Some("123456".as_bytes()));
         assert_eq!(lcp("1234_6"), Some("123".as_bytes()));
         assert_eq!(lcp("123456789"), Some("123456".as_bytes()));
+    }
+
+    #[test]
+    fn get_longest_common_prefix_mut_works() {
+        let mut map = [("123", 1), ("123456", 2), ("1234_67", 3), ("123abc", 4), ("123def", 5)]
+            .iter()
+            .cloned()
+            .map(|(k, v)| (String::from(k), v))
+            .collect::<StringPatriciaMap<usize>>();
+
+        assert_eq!(map.get_longest_common_prefix_mut(""), None);
+        assert_eq!(map.get_longest_common_prefix_mut("12"), None);
+        assert_eq!(map.get_longest_common_prefix_mut("123"), Some(("123", &mut 1)));
+        *map.get_longest_common_prefix_mut("123").unwrap().1 = 10;
+        assert_eq!(map.get_longest_common_prefix_mut("1234"), Some(("123", &mut 10)));
+        assert_eq!(map.get_longest_common_prefix_mut("123456"), Some(("123456", &mut 2)));
+        *map.get_longest_common_prefix_mut("1234567").unwrap().1 = 20;
+        assert_eq!(map.get_longest_common_prefix_mut("1234_6"), Some(("123", &mut 10)));
+        assert_eq!(map.get_longest_common_prefix_mut("123456789"), Some(("123456", &mut 20)));
     }
 
     fn set_to_labels(set: &PatriciaSet) -> Vec<(usize, &str)> {

@@ -189,6 +189,35 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
         Some((K::Borrowed::from_bytes(key), value))
     }
 
+    /// Finds the longest common prefix of `key` and the keys in this map,
+    /// and returns a reference to the entry whose key matches the prefix.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map = PatriciaMap::new();
+    /// map.insert("foo", 1);
+    /// map.insert("foobar", 2);
+    /// assert_eq!(map.get_longest_common_prefix_mut("fo"), None);
+    /// assert_eq!(map.get_longest_common_prefix_mut("foo"), Some(("foo".as_bytes(), &mut 1)));
+    /// *map.get_longest_common_prefix_mut("foo").unwrap().1 = 3;
+    /// assert_eq!(map.get_longest_common_prefix_mut("fooba"), Some(("foo".as_bytes(), &mut 3)));
+    /// assert_eq!(map.get_longest_common_prefix_mut("foobar"), Some(("foobar".as_bytes(), &mut 2)));
+    /// *map.get_longest_common_prefix_mut("foobar").unwrap().1 = 4;
+    /// assert_eq!(map.get_longest_common_prefix_mut("foobarbaz"), Some(("foobar".as_bytes(), &mut 4)));
+    /// ```
+    pub fn get_longest_common_prefix_mut<'a, Q>(&mut self, key: &'a Q) -> Option<(&'a K::Borrowed, &mut V)>
+        where
+            Q: ?Sized + AsRef<K::Borrowed>,
+    {
+        let (key, value) = self
+            .tree
+            .get_longest_common_prefix_mut(key.as_ref().as_bytes())?;
+        Some((K::Borrowed::from_bytes(key), value))
+    }
+
     /// Inserts a key-value pair into this map.
     ///
     /// If the map did not have this key present, `None` is returned.
