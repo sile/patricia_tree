@@ -16,7 +16,7 @@ impl<V> PatriciaTree<V> {
             len: 0,
         }
     }
-    #[cfg(feature = "serde")]
+    #[cfg(any(test, feature = "serde"))]
     pub fn root(&self) -> &Node<V> {
         &self.root
     }
