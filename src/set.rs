@@ -92,7 +92,7 @@ impl<T> GenericPatriciaSet<T> {
         }
     }
 
-    #[cfg(feature = "serde")]
+    #[cfg(any(test, feature = "serde"))]
     pub(crate) fn as_node(&self) -> &Node<()> {
         self.map.as_node()
     }

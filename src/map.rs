@@ -1,6 +1,6 @@
 //! A map based on a patricia tree.
 use crate::node;
-#[cfg(feature = "serde")]
+#[cfg(any(test, feature = "serde"))]
 use crate::node::Node;
 use crate::tree::{self, PatriciaTree};
 use crate::{BorrowedBytes, Bytes};
@@ -105,7 +105,7 @@ impl<K, V> GenericPatriciaMap<K, V> {
         }
     }
 
-    #[cfg(feature = "serde")]
+    #[cfg(any(test, feature = "serde"))]
     pub(crate) fn as_node(&self) -> &Node<V> {
         self.tree.root()
     }
