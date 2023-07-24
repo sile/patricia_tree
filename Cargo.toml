@@ -20,7 +20,6 @@ serde = { version = "1", optional = true }
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }
-postcard = { version = "1", features = ["use-std"] }
 rand = "0.8"
 serde_json = { version = "1" }
 

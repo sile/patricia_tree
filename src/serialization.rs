@@ -261,25 +261,8 @@ mod tests {
         input.sort();
 
         let map: PatriciaMap<u32> = input.iter().cloned().collect();
-        let bytes = postcard::to_allocvec(&map).unwrap();
-        let map: PatriciaMap<u32> = postcard::from_bytes(&bytes).unwrap();
-
-        assert_eq!(map.len(), 3);
-        assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
-    }
-
-    #[test]
-    fn serde_json_works() {
-        let mut input = vec![
-            (Vec::from("foo"), 1u32),
-            ("bar".into(), 2),
-            ("baz".into(), 3),
-        ];
-        input.sort();
-
-        let map: PatriciaMap<u32> = input.iter().cloned().collect();
-        let json = serde_json::to_string(&map).unwrap();
-        let map: PatriciaMap<u32> = serde_json::from_str(&json).unwrap();
+        let serialized = serde_json::to_vec(&map).unwrap();
+        let map: PatriciaMap<u32> = serde_json::from_slice(serialized.as_slice()).unwrap();
 
         assert_eq!(map.len(), 3);
         assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
@@ -293,8 +276,8 @@ mod tests {
         input.sort();
 
         let map: PatriciaMap<u32> = input.iter().cloned().collect();
-        let bytes = postcard::to_allocvec(&map).unwrap();
-        let map: PatriciaMap<u32> = postcard::from_bytes(&bytes).unwrap();
+        let serialized = serde_json::to_vec(&map).unwrap();
+        let map: PatriciaMap<u32> = serde_json::from_slice(serialized.as_slice()).unwrap();
 
         assert_eq!(map.len(), 10000);
         assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
