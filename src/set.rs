@@ -246,15 +246,7 @@ impl<T: Bytes> GenericPatriciaSet<T> {
 }
 impl<T: Bytes + fmt::Debug> fmt::Debug for GenericPatriciaSet<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{")?;
-        for (i, t) in self.iter().enumerate() {
-            if i != 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{:?}", t)?;
-        }
-        write!(f, "}}")?;
-        Ok(())
+        f.debug_set().entries(self.iter()).finish()
     }
 }
 impl<T> Clone for GenericPatriciaSet<T> {

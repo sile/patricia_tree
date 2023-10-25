@@ -491,15 +491,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
 }
 impl<K: Bytes + fmt::Debug, V: fmt::Debug> fmt::Debug for GenericPatriciaMap<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{")?;
-        for (i, (k, v)) in self.iter().enumerate() {
-            if i != 0 {
-                write!(f, ", ")?;
-            }
-            write!(f, "{:?}: {:?}", k, v)?;
-        }
-        write!(f, "}}")?;
-        Ok(())
+        f.debug_map().entries(self.iter()).finish()
     }
 }
 impl<K, V: Clone> Clone for GenericPatriciaMap<K, V> {
