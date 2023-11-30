@@ -30,6 +30,8 @@ extern crate bitflags;
 #[cfg(test)]
 extern crate rand;
 
+use std::cmp::Ordering;
+
 pub use map::{GenericPatriciaMap, PatriciaMap, StringPatriciaMap};
 pub use set::{GenericPatriciaSet, PatriciaSet, StringPatriciaSet};
 
@@ -70,6 +72,16 @@ pub trait BorrowedBytes {
 
     /// Returns a suffix of this instance not containing the common prefix with the given bytes.
     fn strip_common_prefix(&self, bytes: &[u8]) -> &Self;
+
+    /// Same as [`strip_common_prefix()`], but also returns the length of the common prefix.
+    fn strip_common_prefix_and_len(&self, bytes: &[u8]) -> (&Self, usize) {
+        let next = self.strip_common_prefix(bytes);
+        let common_prefix_len = self.as_bytes().len() - next.as_bytes().len();
+        (next, common_prefix_len)
+    }
+
+    /// Compares the first item of this instance with the first item represented in the the given bytes.
+    fn cmp_first_item(&self, bytes: &[u8]) -> Ordering;
 }
 
 impl BorrowedBytes for [u8] {
@@ -92,6 +104,10 @@ impl BorrowedBytes for [u8] {
             .take_while(|(a, b)| a == b)
             .count();
         &self[i..]
+    }
+
+    fn cmp_first_item(&self, bytes: &[u8]) -> Ordering {
+        self.first().cmp(&bytes.first())
     }
 }
 
@@ -119,5 +135,11 @@ impl BorrowedBytes for str {
             }
         }
         ""
+    }
+
+    fn cmp_first_item(&self, bytes: &[u8]) -> Ordering {
+        self.chars()
+            .next()
+            .cmp(&Self::from_bytes(bytes).chars().next())
     }
 }
