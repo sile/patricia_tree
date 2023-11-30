@@ -145,7 +145,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(map.get("bar"), None);
     /// ```
     pub fn get<Q: AsRef<K::Borrowed>>(&self, key: Q) -> Option<&V> {
-        self.tree.get(key.as_ref().as_bytes())
+        self.tree.get(key.as_ref())
     }
 
     /// Returns a mutable reference to the value corresponding to the key.

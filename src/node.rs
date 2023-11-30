@@ -405,21 +405,21 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn get(&self, key: &[u8]) -> Option<&V> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
+    pub(crate) fn get<K: ?Sized + BorrowedBytes>(&self, key: &K) -> Option<&V> {
+        let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         if common_prefix_len == self.label().len() {
-            if next.is_empty() {
+            if next.as_bytes().is_empty() {
                 self.value()
             } else {
                 self.child().and_then(|child| child.get(next))
             }
-        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
+        } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
             self.sibling().and_then(|sibling| sibling.get(next))
         } else {
             None
         }
     }
+
     pub(crate) fn get_mut(&mut self, key: &[u8]) -> Option<&mut V> {
         let common_prefix_len = self.skip_common_prefix(key);
         let next = &key[common_prefix_len..];
@@ -583,7 +583,7 @@ impl<V> Node<V> {
         }
     }
     pub(crate) fn insert<K: ?Sized + BorrowedBytes>(&mut self, key: &K, value: V) -> Option<V> {
-        if self.label().first() > key.as_bytes().first() {
+        if key.cmp_first_item(self.label()).is_lt() {
             let this = Node {
                 ptr: self.ptr,
                 _value: PhantomData,
@@ -594,8 +594,7 @@ impl<V> Node<V> {
             return None;
         }
 
-        let next = key.strip_common_prefix(self.label());
-        let common_prefix_len = key.as_bytes().len() - next.as_bytes().len();
+        let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         let is_label_matched = common_prefix_len == self.label().len();
         if next.as_bytes().is_empty() {
             if is_label_matched {

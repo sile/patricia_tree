@@ -32,7 +32,7 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
-    pub fn get(&self, key: &[u8]) -> Option<&V> {
+    pub fn get<K: ?Sized + BorrowedBytes>(&self, key: &K) -> Option<&V> {
         self.root.get(key)
     }
     pub fn get_mut(&mut self, key: &[u8]) -> Option<&mut V> {
