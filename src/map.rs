@@ -944,4 +944,16 @@ mod tests {
         assert_eq!(map.len(), map.iter().count());
         assert_eq!(map.len(), map.iter_mut().count());
     }
+
+    #[test]
+    fn issue35() {
+        let mut map = StringPatriciaMap::<u8>::new();
+        map.insert("インターポール", 1);
+        map.insert("インターポル", 2);
+        map.insert("インターリーブ", 3);
+        map.insert("インターン", 4);
+
+        assert_eq!(map.get("インターポール"), Some(&1));
+        assert_eq!(map.get("インターポル"), Some(&2));
+    }
 }
