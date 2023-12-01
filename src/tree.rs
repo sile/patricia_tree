@@ -35,40 +35,49 @@ impl<V> PatriciaTree<V> {
     pub fn get<K: ?Sized + BorrowedBytes>(&self, key: &K) -> Option<&V> {
         self.root.get(key)
     }
-    pub fn get_mut(&mut self, key: &[u8]) -> Option<&mut V> {
+    pub fn get_mut<K: ?Sized + BorrowedBytes>(&mut self, key: &K) -> Option<&mut V> {
         self.root.get_mut(key)
     }
-    pub fn get_longest_common_prefix<'a>(&self, key: &'a [u8]) -> Option<(&'a [u8], &V)> {
+    pub fn get_longest_common_prefix<'a, K: ?Sized + BorrowedBytes>(
+        &self,
+        key: &'a K,
+    ) -> Option<(&'a [u8], &V)> {
         self.root
             .get_longest_common_prefix(key, 0)
-            .map(|(n, v)| (&key[..n], v))
+            .map(|(n, v)| (&key.as_bytes()[..n], v))
     }
-    pub fn get_longest_common_prefix_mut<'a>(
+    pub fn get_longest_common_prefix_mut<'a, K: ?Sized + BorrowedBytes>(
         &mut self,
-        key: &'a [u8],
+        key: &'a K,
     ) -> Option<(&'a [u8], &mut V)> {
         self.root
             .get_longest_common_prefix_mut(key, 0)
-            .map(|(n, v)| (&key[..n], v))
+            .map(|(n, v)| (&key.as_bytes()[..n], v))
     }
-    pub fn iter_prefix<'a, 'b>(&'a self, prefix: &'b [u8]) -> Option<(usize, Nodes<V>)> {
+    pub fn iter_prefix<'a, 'b, K: ?Sized + BorrowedBytes>(
+        &'a self,
+        prefix: &'b K,
+    ) -> Option<(usize, Nodes<V>)> {
         if let Some((common_prefix_len, node)) = self.root.get_prefix_node(prefix, 0) {
             let nodes = Nodes {
                 nodes: node.iter_descendant(),
                 label_lens: Vec::new(),
             };
-            Some((prefix.len() - common_prefix_len, nodes))
+            Some((prefix.as_bytes().len() - common_prefix_len, nodes))
         } else {
             None
         }
     }
-    pub fn iter_prefix_mut<'a, 'b>(&'a mut self, prefix: &'b [u8]) -> Option<(usize, NodesMut<V>)> {
+    pub fn iter_prefix_mut<'a, 'b, K: ?Sized + BorrowedBytes>(
+        &'a mut self,
+        prefix: &'b K,
+    ) -> Option<(usize, NodesMut<V>)> {
         if let Some((common_prefix_len, node)) = self.root.get_prefix_node_mut(prefix, 0) {
             let nodes = NodesMut {
                 nodes: node.iter_descendant_mut(),
                 label_lens: Vec::new(),
             };
-            Some((prefix.len() - common_prefix_len, nodes))
+            Some((prefix.as_bytes().len() - common_prefix_len, nodes))
         } else {
             None
         }
@@ -79,7 +88,7 @@ impl<V> PatriciaTree<V> {
     {
         self.root.common_prefixes(key)
     }
-    pub fn remove(&mut self, key: &[u8]) -> Option<V> {
+    pub fn remove<K: ?Sized + BorrowedBytes>(&mut self, key: &K) -> Option<V> {
         if let Some(old) = self.root.remove(key, 0) {
             self.len -= 1;
             Some(old)
@@ -87,9 +96,9 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
-    pub fn split_by_prefix(&mut self, prefix: &[u8]) -> Self {
+    pub fn split_by_prefix<K: ?Sized + BorrowedBytes>(&mut self, prefix: &K) -> Self {
         if let Some(splitted_root) = self.root.split_by_prefix(prefix, 0) {
-            let mut splitted_root = Node::new(prefix, None, Some(splitted_root), None);
+            let mut splitted_root = Node::new(prefix.as_bytes(), None, Some(splitted_root), None);
             splitted_root.try_merge_with_child(1);
             let splitted = Self::from(Node::new(b"", None, Some(splitted_root), None));
             self.len -= splitted.len();

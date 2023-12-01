@@ -82,6 +82,11 @@ pub trait BorrowedBytes {
 
     /// Compares the first item of this instance with the first item represented in the the given bytes.
     fn cmp_first_item(&self, bytes: &[u8]) -> Ordering;
+
+    /// Returns `true` if this instance is empty, otherwise `false`.
+    fn is_empty(&self) -> bool {
+        self.as_bytes().is_empty()
+    }
 }
 
 impl BorrowedBytes for [u8] {

@@ -129,7 +129,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert!(!map.contains_key("bar"));
     /// ```
     pub fn contains_key<Q: AsRef<K::Borrowed>>(&self, key: Q) -> bool {
-        self.tree.get(key.as_ref().as_bytes()).is_some()
+        self.tree.get(key.as_ref()).is_some()
     }
 
     /// Returns a reference to the value corresponding to the key.
@@ -161,7 +161,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(map.get("foo"), Some(&2));
     /// ```
     pub fn get_mut<Q: AsRef<K::Borrowed>>(&mut self, key: Q) -> Option<&mut V> {
-        self.tree.get_mut(key.as_ref().as_bytes())
+        self.tree.get_mut(key.as_ref())
     }
 
     /// Finds the longest common prefix of `key` and the keys in this map,
@@ -185,9 +185,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     where
         Q: ?Sized + AsRef<K::Borrowed>,
     {
-        let (key, value) = self
-            .tree
-            .get_longest_common_prefix(key.as_ref().as_bytes())?;
+        let (key, value) = self.tree.get_longest_common_prefix(key.as_ref())?;
         Some((K::Borrowed::from_bytes(key), value))
     }
 
@@ -217,9 +215,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     where
         Q: ?Sized + AsRef<K::Borrowed>,
     {
-        let (key, value) = self
-            .tree
-            .get_longest_common_prefix_mut(key.as_ref().as_bytes())?;
+        let (key, value) = self.tree.get_longest_common_prefix_mut(key.as_ref())?;
         Some((K::Borrowed::from_bytes(key), value))
     }
 
@@ -256,7 +252,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(map.remove("foo"), None);
     /// ```
     pub fn remove<Q: AsRef<K::Borrowed>>(&mut self, key: Q) -> Option<V> {
-        self.tree.remove(key.as_ref().as_bytes())
+        self.tree.remove(key.as_ref())
     }
 
     /// Returns an iterator that collects all entries in the map up to a certain key.
@@ -338,7 +334,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(b.keys().collect::<Vec<_>>(), [b"elixir", b"erlang"]);
     /// ```
     pub fn split_by_prefix<Q: AsRef<K::Borrowed>>(&mut self, prefix: Q) -> Self {
-        let subtree = self.tree.split_by_prefix(prefix.as_ref().as_bytes());
+        let subtree = self.tree.split_by_prefix(prefix.as_ref());
         GenericPatriciaMap {
             tree: subtree,
             _key: PhantomData,
@@ -455,7 +451,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
         'b: 'a,
     {
         self.tree
-            .iter_prefix(prefix.as_bytes())
+            .iter_prefix(prefix)
             .into_iter()
             .flat_map(move |(prefix_len, nodes)| {
                 Iter::<K, V>::new(nodes, Vec::from(&prefix.as_bytes()[..prefix_len]))
@@ -482,7 +478,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
         'b: 'a,
     {
         self.tree
-            .iter_prefix_mut(prefix.as_bytes())
+            .iter_prefix_mut(prefix)
             .into_iter()
             .flat_map(move |(prefix_len, nodes)| {
                 IterMut::<K, V>::new(nodes, Vec::from(&prefix.as_bytes()[..prefix_len]))
