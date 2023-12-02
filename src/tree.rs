@@ -58,7 +58,7 @@ impl<V> PatriciaTree<V> {
         &'a self,
         prefix: &'b K,
     ) -> Option<(usize, Nodes<V>)> {
-        if let Some((common_prefix_len, node)) = self.root.get_prefix_node(prefix, 0) {
+        if let Some((common_prefix_len, node)) = self.root.get_prefix_node(prefix) {
             let nodes = Nodes {
                 nodes: node.iter_descendant(),
                 label_lens: Vec::new(),
@@ -72,7 +72,7 @@ impl<V> PatriciaTree<V> {
         &'a mut self,
         prefix: &'b K,
     ) -> Option<(usize, NodesMut<V>)> {
-        if let Some((common_prefix_len, node)) = self.root.get_prefix_node_mut(prefix, 0) {
+        if let Some((common_prefix_len, node)) = self.root.get_prefix_node_mut(prefix) {
             let nodes = NodesMut {
                 nodes: node.iter_descendant_mut(),
                 label_lens: Vec::new(),

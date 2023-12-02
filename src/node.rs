@@ -484,18 +484,15 @@ impl<V> Node<V> {
     pub(crate) fn get_prefix_node<K: ?Sized + BorrowedBytes>(
         &self,
         key: &K,
-        offset: usize,
     ) -> Option<(usize, &Self)> {
         let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         if next.is_empty() {
-            Some((common_prefix_len, self)) // TODO: return offset?
+            Some((common_prefix_len, self))
         } else if common_prefix_len == self.label().len() {
-            let offset = offset + common_prefix_len;
-            self.child()
-                .and_then(|child| child.get_prefix_node(next, offset))
+            self.child().and_then(|child| child.get_prefix_node(next))
         } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
             self.sibling()
-                .and_then(|sibling| sibling.get_prefix_node(next, offset))
+                .and_then(|sibling| sibling.get_prefix_node(next))
         } else {
             None
         }
@@ -504,18 +501,16 @@ impl<V> Node<V> {
     pub(crate) fn get_prefix_node_mut<K: ?Sized + BorrowedBytes>(
         &mut self,
         key: &K,
-        offset: usize,
     ) -> Option<(usize, &mut Self)> {
         let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         if next.is_empty() {
-            Some((common_prefix_len, self)) // TODO: return offset?
+            Some((common_prefix_len, self))
         } else if common_prefix_len == self.label().len() {
-            let offset = offset + common_prefix_len;
             self.child_mut()
-                .and_then(|child| child.get_prefix_node_mut(next, offset))
+                .and_then(|child| child.get_prefix_node_mut(next))
         } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
             self.sibling_mut()
-                .and_then(|sibling| sibling.get_prefix_node_mut(next, offset))
+                .and_then(|sibling| sibling.get_prefix_node_mut(next))
         } else {
             None
         }
