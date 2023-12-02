@@ -395,9 +395,12 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn common_prefixes<K>(&self, key: K) -> CommonPrefixesIter<K, V>
+    pub(crate) fn common_prefixes<'a, 'b, K>(
+        &'a self,
+        key: &'b K,
+    ) -> CommonPrefixesIter<'a, 'b, K, V>
     where
-        K: AsRef<[u8]>,
+        K: ?Sized + BorrowedBytes,
     {
         CommonPrefixesIter {
             key,
@@ -849,20 +852,19 @@ impl<'a, V: 'a> Iterator for IterMut<'a, V> {
 /// An iterator over entries in that collects all values up to
 /// until the key stops matching.
 #[derive(Debug)]
-pub(crate) struct CommonPrefixesIter<'a, K, V> {
-    key: K,
+pub(crate) struct CommonPrefixesIter<'a, 'b, K: ?Sized, V> {
+    key: &'b K,
     stack: Vec<(usize, &'a Node<V>)>,
 }
 
-impl<'a, K, V> Iterator for CommonPrefixesIter<'a, K, V>
+impl<'a, 'b, K, V> Iterator for CommonPrefixesIter<'a, 'b, K, V>
 where
-    K: AsRef<[u8]>,
+    K: ?Sized + BorrowedBytes,
 {
     type Item = (usize, &'a Node<V>);
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((offset, node)) = self.stack.pop() {
-            // TODO:
-            let key = &self.key.as_ref()[offset..];
+            let key = self.key.strip_n_prefix(offset);
             let (_next, common_prefix_len) = key.strip_common_prefix_and_len(node.label());
             if common_prefix_len == 0 && key.cmp_first_item(node.label()).is_ge() {
                 if let Some(sibling) = node.sibling() {

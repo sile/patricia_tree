@@ -275,14 +275,17 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefixes<'a, 'b>(&'a self, key: &'b [u8]) -> CommonPrefixesIter<'a, 'b, K, V>
+    pub fn common_prefixes<'a, 'b, Q>(
+        &'a self,
+        key: &'b Q,
+    ) -> CommonPrefixesIter<'a, 'b, K::Borrowed, V>
     where
         'a: 'b,
+        Q: ?Sized + AsRef<K::Borrowed>,
     {
         CommonPrefixesIter {
-            key_bytes: key,
-            iterator: self.tree.common_prefixes(key),
-            _key: PhantomData,
+            key_bytes: key.as_ref().as_bytes(),
+            iterator: self.tree.common_prefixes(key.as_ref()),
         }
     }
 
@@ -304,9 +307,13 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefix_values<'a>(&'a self, key: &[u8]) -> impl 'a + Iterator<Item = &'a V> {
+    pub fn common_prefix_values<'a, 'b, Q>(&'a self, key: &'b Q) -> impl 'a + Iterator<Item = &'a V>
+    where
+        'b: 'a,
+        Q: ?Sized + AsRef<K::Borrowed>,
+    {
         self.tree
-            .common_prefixes(key.to_owned())
+            .common_prefixes(key.as_ref())
             .filter_map(|(_, n)| n.value())
     }
 
@@ -676,18 +683,20 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
 /// An iterator over entries in a `PatriciaMap` that share a common prefix with
 /// a given key.
 #[derive(Debug)]
-pub struct CommonPrefixesIter<'a, 'b, K, V> {
+pub struct CommonPrefixesIter<'a, 'b, K: ?Sized, V> {
     key_bytes: &'b [u8],
-    iterator: node::CommonPrefixesIter<'a, &'b [u8], V>,
-    _key: PhantomData<K>,
+    iterator: node::CommonPrefixesIter<'a, 'b, K, V>,
 }
-impl<'a, 'b, K: 'b + Bytes, V> Iterator for CommonPrefixesIter<'a, 'b, K, V> {
-    type Item = (&'b K::Borrowed, &'a V);
+impl<'a, 'b, K, V> Iterator for CommonPrefixesIter<'a, 'b, K, V>
+where
+    K: 'b + ?Sized + BorrowedBytes,
+{
+    type Item = (&'b K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
         for (prefix_len, n) in self.iterator.by_ref() {
             if let Some(v) = n.value() {
-                return Some((K::Borrowed::from_bytes(&self.key_bytes[..prefix_len]), v));
+                return Some((K::from_bytes(&self.key_bytes[..prefix_len]), v));
             }
         }
 

@@ -87,6 +87,9 @@ pub trait BorrowedBytes {
     fn is_empty(&self) -> bool {
         self.as_bytes().is_empty()
     }
+
+    /// Returns a suffix of this instance not containing the first `n` bytes.
+    fn strip_n_prefix(&self, n: usize) -> &Self;
 }
 
 impl BorrowedBytes for [u8] {
@@ -113,6 +116,10 @@ impl BorrowedBytes for [u8] {
 
     fn cmp_first_item(&self, bytes: &[u8]) -> Ordering {
         self.first().cmp(&bytes.first())
+    }
+
+    fn strip_n_prefix(&self, n: usize) -> &Self {
+        &self[n..]
     }
 }
 
@@ -146,5 +153,9 @@ impl BorrowedBytes for str {
         self.chars()
             .next()
             .cmp(&Self::from_bytes(bytes).chars().next())
+    }
+
+    fn strip_n_prefix(&self, n: usize) -> &Self {
+        &self[n..]
     }
 }
