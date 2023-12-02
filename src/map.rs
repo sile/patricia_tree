@@ -129,7 +129,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert!(!map.contains_key("bar"));
     /// ```
     pub fn contains_key<Q: AsRef<K::Borrowed>>(&self, key: Q) -> bool {
-        self.tree.get(key.as_ref().as_bytes()).is_some()
+        self.tree.get(key.as_ref()).is_some()
     }
 
     /// Returns a reference to the value corresponding to the key.
@@ -145,7 +145,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(map.get("bar"), None);
     /// ```
     pub fn get<Q: AsRef<K::Borrowed>>(&self, key: Q) -> Option<&V> {
-        self.tree.get(key.as_ref().as_bytes())
+        self.tree.get(key.as_ref())
     }
 
     /// Returns a mutable reference to the value corresponding to the key.
@@ -161,7 +161,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(map.get("foo"), Some(&2));
     /// ```
     pub fn get_mut<Q: AsRef<K::Borrowed>>(&mut self, key: Q) -> Option<&mut V> {
-        self.tree.get_mut(key.as_ref().as_bytes())
+        self.tree.get_mut(key.as_ref())
     }
 
     /// Finds the longest common prefix of `key` and the keys in this map,
@@ -185,9 +185,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     where
         Q: ?Sized + AsRef<K::Borrowed>,
     {
-        let (key, value) = self
-            .tree
-            .get_longest_common_prefix(key.as_ref().as_bytes())?;
+        let (key, value) = self.tree.get_longest_common_prefix(key.as_ref())?;
         Some((K::Borrowed::from_bytes(key), value))
     }
 
@@ -217,9 +215,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     where
         Q: ?Sized + AsRef<K::Borrowed>,
     {
-        let (key, value) = self
-            .tree
-            .get_longest_common_prefix_mut(key.as_ref().as_bytes())?;
+        let (key, value) = self.tree.get_longest_common_prefix_mut(key.as_ref())?;
         Some((K::Borrowed::from_bytes(key), value))
     }
 
@@ -256,7 +252,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(map.remove("foo"), None);
     /// ```
     pub fn remove<Q: AsRef<K::Borrowed>>(&mut self, key: Q) -> Option<V> {
-        self.tree.remove(key.as_ref().as_bytes())
+        self.tree.remove(key.as_ref())
     }
 
     /// Returns an iterator that collects all entries in the map up to a certain key.
@@ -279,14 +275,17 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefixes<'a, 'b>(&'a self, key: &'b [u8]) -> CommonPrefixesIter<'a, 'b, K, V>
+    pub fn common_prefixes<'a, 'b, Q>(
+        &'a self,
+        key: &'b Q,
+    ) -> CommonPrefixesIter<'a, 'b, K::Borrowed, V>
     where
         'a: 'b,
+        Q: ?Sized + AsRef<K::Borrowed>,
     {
         CommonPrefixesIter {
-            key_bytes: key,
-            iterator: self.tree.common_prefixes(key),
-            _key: PhantomData,
+            key_bytes: key.as_ref().as_bytes(),
+            iterator: self.tree.common_prefixes(key.as_ref()),
         }
     }
 
@@ -308,9 +307,13 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefix_values<'a>(&'a self, key: &[u8]) -> impl 'a + Iterator<Item = &'a V> {
+    pub fn common_prefix_values<'a, 'b, Q>(&'a self, key: &'b Q) -> impl 'a + Iterator<Item = &'a V>
+    where
+        'b: 'a,
+        Q: ?Sized + AsRef<K::Borrowed>,
+    {
         self.tree
-            .common_prefixes(key.to_owned())
+            .common_prefixes(key.as_ref())
             .filter_map(|(_, n)| n.value())
     }
 
@@ -338,7 +341,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(b.keys().collect::<Vec<_>>(), [b"elixir", b"erlang"]);
     /// ```
     pub fn split_by_prefix<Q: AsRef<K::Borrowed>>(&mut self, prefix: Q) -> Self {
-        let subtree = self.tree.split_by_prefix(prefix.as_ref().as_bytes());
+        let subtree = self.tree.split_by_prefix(prefix.as_ref());
         GenericPatriciaMap {
             tree: subtree,
             _key: PhantomData,
@@ -455,7 +458,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
         'b: 'a,
     {
         self.tree
-            .iter_prefix(prefix.as_bytes())
+            .iter_prefix(prefix)
             .into_iter()
             .flat_map(move |(prefix_len, nodes)| {
                 Iter::<K, V>::new(nodes, Vec::from(&prefix.as_bytes()[..prefix_len]))
@@ -482,7 +485,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
         'b: 'a,
     {
         self.tree
-            .iter_prefix_mut(prefix.as_bytes())
+            .iter_prefix_mut(prefix)
             .into_iter()
             .flat_map(move |(prefix_len, nodes)| {
                 IterMut::<K, V>::new(nodes, Vec::from(&prefix.as_bytes()[..prefix_len]))
@@ -680,18 +683,20 @@ impl<'a, V: 'a> Iterator for ValuesMut<'a, V> {
 /// An iterator over entries in a `PatriciaMap` that share a common prefix with
 /// a given key.
 #[derive(Debug)]
-pub struct CommonPrefixesIter<'a, 'b, K, V> {
+pub struct CommonPrefixesIter<'a, 'b, K: ?Sized, V> {
     key_bytes: &'b [u8],
-    iterator: node::CommonPrefixesIter<'a, &'b [u8], V>,
-    _key: PhantomData<K>,
+    iterator: node::CommonPrefixesIter<'a, 'b, K, V>,
 }
-impl<'a, 'b, K: 'b + Bytes, V> Iterator for CommonPrefixesIter<'a, 'b, K, V> {
-    type Item = (&'b K::Borrowed, &'a V);
+impl<'a, 'b, K, V> Iterator for CommonPrefixesIter<'a, 'b, K, V>
+where
+    K: 'b + ?Sized + BorrowedBytes,
+{
+    type Item = (&'b K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
         for (prefix_len, n) in self.iterator.by_ref() {
             if let Some(v) = n.value() {
-                return Some((K::Borrowed::from_bytes(&self.key_bytes[..prefix_len]), v));
+                return Some((K::from_bytes(&self.key_bytes[..prefix_len]), v));
             }
         }
 
@@ -943,5 +948,17 @@ mod tests {
         map.insert("2", 0);
         assert_eq!(map.len(), map.iter().count());
         assert_eq!(map.len(), map.iter_mut().count());
+    }
+
+    #[test]
+    fn issue35() {
+        let mut map = StringPatriciaMap::<u8>::new();
+        map.insert("インターポール", 1);
+        map.insert("インターポル", 2);
+        map.insert("インターリーブ", 3);
+        map.insert("インターン", 4);
+
+        assert_eq!(map.get("インターポール"), Some(&1));
+        assert_eq!(map.get("インターポル"), Some(&2));
     }
 }

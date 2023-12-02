@@ -395,9 +395,12 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn common_prefixes<K>(&self, key: K) -> CommonPrefixesIter<K, V>
+    pub(crate) fn common_prefixes<'a, 'b, K>(
+        &'a self,
+        key: &'b K,
+    ) -> CommonPrefixesIter<'a, 'b, K, V>
     where
-        K: AsRef<[u8]>,
+        K: ?Sized + BorrowedBytes,
     {
         CommonPrefixesIter {
             key,
@@ -405,44 +408,42 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn get(&self, key: &[u8]) -> Option<&V> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
+    pub(crate) fn get<K: ?Sized + BorrowedBytes>(&self, key: &K) -> Option<&V> {
+        let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         if common_prefix_len == self.label().len() {
             if next.is_empty() {
                 self.value()
             } else {
                 self.child().and_then(|child| child.get(next))
             }
-        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
+        } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
             self.sibling().and_then(|sibling| sibling.get(next))
         } else {
             None
         }
     }
-    pub(crate) fn get_mut(&mut self, key: &[u8]) -> Option<&mut V> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
+
+    pub(crate) fn get_mut<K: ?Sized + BorrowedBytes>(&mut self, key: &K) -> Option<&mut V> {
+        let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         if common_prefix_len == self.label().len() {
             if next.is_empty() {
                 self.value_mut()
             } else {
                 self.child_mut().and_then(|child| child.get_mut(next))
             }
-        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
+        } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
             self.sibling_mut().and_then(|sibling| sibling.get_mut(next))
         } else {
             None
         }
     }
 
-    pub(crate) fn get_longest_common_prefix(
+    pub(crate) fn get_longest_common_prefix<K: ?Sized + BorrowedBytes>(
         &self,
-        key: &[u8],
+        key: &K,
         offset: usize,
     ) -> Option<(usize, &V)> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
+        let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         if common_prefix_len == self.label().len() {
             let offset = offset + common_prefix_len;
             if next.is_empty() {
@@ -452,20 +453,19 @@ impl<V> Node<V> {
                     .and_then(|child| child.get_longest_common_prefix(next, offset))
                     .or_else(|| self.value().map(|v| (offset, v)))
             }
-        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
+        } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
             self.sibling()
                 .and_then(|sibling| sibling.get_longest_common_prefix(next, offset))
         } else {
             None
         }
     }
-    pub(crate) fn get_longest_common_prefix_mut(
+    pub(crate) fn get_longest_common_prefix_mut<K: ?Sized + BorrowedBytes>(
         &mut self,
-        key: &[u8],
+        key: &K,
         offset: usize,
     ) -> Option<(usize, &mut V)> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
+        let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         if common_prefix_len == self.label().len() {
             let offset = offset + common_prefix_len;
             if next.is_empty() {
@@ -476,7 +476,7 @@ impl<V> Node<V> {
                     .and_then(|child| child.get_longest_common_prefix_mut(next, offset))
                     .or_else(|| this.value.map(|v| (offset, v)))
             }
-        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
+        } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
             self.sibling_mut()
                 .and_then(|sibling| sibling.get_longest_common_prefix_mut(next, offset))
         } else {
@@ -484,47 +484,48 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn get_prefix_node(&self, key: &[u8], offset: usize) -> Option<(usize, &Self)> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
+    pub(crate) fn get_prefix_node<K: ?Sized + BorrowedBytes>(
+        &self,
+        key: &K,
+    ) -> Option<(usize, &Self)> {
+        let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         if next.is_empty() {
             Some((common_prefix_len, self))
         } else if common_prefix_len == self.label().len() {
-            let offset = offset + common_prefix_len;
-            self.child()
-                .and_then(|child| child.get_prefix_node(next, offset))
-        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
+            self.child().and_then(|child| child.get_prefix_node(next))
+        } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
             self.sibling()
-                .and_then(|sibling| sibling.get_prefix_node(next, offset))
+                .and_then(|sibling| sibling.get_prefix_node(next))
         } else {
             None
         }
     }
 
-    pub(crate) fn get_prefix_node_mut(
+    pub(crate) fn get_prefix_node_mut<K: ?Sized + BorrowedBytes>(
         &mut self,
-        key: &[u8],
-        offset: usize,
+        key: &K,
     ) -> Option<(usize, &mut Self)> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
+        let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         if next.is_empty() {
             Some((common_prefix_len, self))
         } else if common_prefix_len == self.label().len() {
-            let offset = offset + common_prefix_len;
             self.child_mut()
-                .and_then(|child| child.get_prefix_node_mut(next, offset))
-        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
+                .and_then(|child| child.get_prefix_node_mut(next))
+        } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
             self.sibling_mut()
-                .and_then(|sibling| sibling.get_prefix_node_mut(next, offset))
+                .and_then(|sibling| sibling.get_prefix_node_mut(next))
         } else {
             None
         }
     }
 
-    pub(crate) fn split_by_prefix(&mut self, prefix: &[u8], level: usize) -> Option<Self> {
-        let common_prefix_len = self.skip_common_prefix(prefix);
-        if common_prefix_len == prefix.len() {
+    pub(crate) fn split_by_prefix<K: ?Sized + BorrowedBytes>(
+        &mut self,
+        prefix: &K,
+        level: usize,
+    ) -> Option<Self> {
+        let (next, common_prefix_len) = prefix.strip_common_prefix_and_len(self.label());
+        if common_prefix_len == prefix.as_bytes().len() {
             let value = self.take_value();
             let child = self.take_child();
             let node = Node::new(&self.label()[common_prefix_len..], value, child, None);
@@ -533,7 +534,6 @@ impl<V> Node<V> {
             }
             Some(node)
         } else if common_prefix_len == self.label().len() {
-            let next = &prefix[common_prefix_len..];
             self.child_mut()
                 .and_then(|child| child.split_by_prefix(next, level + 1))
                 .map(|old| {
@@ -541,8 +541,7 @@ impl<V> Node<V> {
                     self.try_merge_with_child(level);
                     old
                 })
-        } else if common_prefix_len == 0 && self.label().first() <= prefix.first() {
-            let next = &prefix[common_prefix_len..];
+        } else if common_prefix_len == 0 && prefix.cmp_first_item(self.label()).is_ge() {
             self.sibling_mut()
                 .and_then(|sibling| sibling.split_by_prefix(next, level))
                 .map(|old| {
@@ -553,9 +552,8 @@ impl<V> Node<V> {
             None
         }
     }
-    pub(crate) fn remove(&mut self, key: &[u8], level: usize) -> Option<V> {
-        let common_prefix_len = self.skip_common_prefix(key);
-        let next = &key[common_prefix_len..];
+    pub(crate) fn remove<K: ?Sized + BorrowedBytes>(&mut self, key: &K, level: usize) -> Option<V> {
+        let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         if common_prefix_len == self.label().len() {
             if next.is_empty() {
                 self.take_value().map(|old| {
@@ -571,7 +569,7 @@ impl<V> Node<V> {
                         old
                     })
             }
-        } else if common_prefix_len == 0 && self.label().first() <= key.first() {
+        } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
             self.sibling_mut()
                 .and_then(|sibling| sibling.remove(next, level))
                 .map(|old| {
@@ -583,7 +581,7 @@ impl<V> Node<V> {
         }
     }
     pub(crate) fn insert<K: ?Sized + BorrowedBytes>(&mut self, key: &K, value: V) -> Option<V> {
-        if self.label().first() > key.as_bytes().first() {
+        if key.cmp_first_item(self.label()).is_lt() {
             let this = Node {
                 ptr: self.ptr,
                 _value: PhantomData,
@@ -594,8 +592,7 @@ impl<V> Node<V> {
             return None;
         }
 
-        let next = key.strip_common_prefix(self.label());
-        let common_prefix_len = key.as_bytes().len() - next.as_bytes().len();
+        let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         let is_label_matched = common_prefix_len == self.label().len();
         if next.as_bytes().is_empty() {
             if is_label_matched {
@@ -626,13 +623,6 @@ impl<V> Node<V> {
             assert_some!(self.child_mut()).insert(next, value);
             None
         }
-    }
-    fn skip_common_prefix(&self, key: &[u8]) -> usize {
-        self.label()
-            .iter()
-            .zip(key.iter())
-            .take_while(|x| x.0 == x.1)
-            .count()
     }
     pub(crate) fn flags(&self) -> Flags {
         Flags::from_bits_truncate(unsafe { *self.ptr })
@@ -862,20 +852,21 @@ impl<'a, V: 'a> Iterator for IterMut<'a, V> {
 /// An iterator over entries in that collects all values up to
 /// until the key stops matching.
 #[derive(Debug)]
-pub(crate) struct CommonPrefixesIter<'a, K, V> {
-    key: K,
+pub(crate) struct CommonPrefixesIter<'a, 'b, K: ?Sized, V> {
+    key: &'b K,
     stack: Vec<(usize, &'a Node<V>)>,
 }
 
-impl<'a, K, V> Iterator for CommonPrefixesIter<'a, K, V>
+impl<'a, 'b, K, V> Iterator for CommonPrefixesIter<'a, 'b, K, V>
 where
-    K: AsRef<[u8]>,
+    K: ?Sized + BorrowedBytes,
 {
     type Item = (usize, &'a Node<V>);
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((offset, node)) = self.stack.pop() {
-            let common_prefix_len = node.skip_common_prefix(&self.key.as_ref()[offset..]);
-            if common_prefix_len == 0 && node.label().first() <= self.key.as_ref().get(offset) {
+            let key = self.key.strip_n_prefix(offset);
+            let (_next, common_prefix_len) = key.strip_common_prefix_and_len(node.label());
+            if common_prefix_len == 0 && key.cmp_first_item(node.label()).is_ge() {
                 if let Some(sibling) = node.sibling() {
                     self.stack.push((offset, sibling));
                 }
