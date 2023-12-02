@@ -17,6 +17,7 @@ macro_rules! assert_some {
 }
 
 bitflags! {
+    #[derive(Clone, Copy)]
     pub (crate) struct Flags: u8 {
         const VALUE_ALLOCATED = 0b0000_0001;
         const VALUE_INITIALIZED = 0b0000_0010;
