@@ -38,6 +38,9 @@ impl<V> PatriciaTree<V> {
     pub fn get_mut<K: ?Sized + BorrowedBytes>(&mut self, key: &K) -> Option<&mut V> {
         self.root.get_mut(key)
     }
+    pub fn longest_common_prefix_len<K: ?Sized + BorrowedBytes>(&self, key: &K) -> usize {
+        self.root.longest_common_prefix_len(key, 0)
+    }
     pub fn get_longest_common_prefix<'a, K: ?Sized + BorrowedBytes>(
         &self,
         key: &'a K,

@@ -438,7 +438,29 @@ impl<V> Node<V> {
             None
         }
     }
-
+    pub(crate) fn longest_common_prefix_len<K: ?Sized + BorrowedBytes>(
+        &self,
+        key: &K,
+        offset: usize,
+    ) -> usize {
+        let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
+        let next_offset = offset + common_prefix_len;
+        if common_prefix_len == self.label().len() {
+            if next.is_empty() {
+                next_offset
+            } else {
+                self.child()
+                    .map(|child| child.longest_common_prefix_len(next, next_offset))
+                    .unwrap_or(next_offset)
+            }
+        } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
+            self.sibling()
+                .map(|sibling| sibling.longest_common_prefix_len(next, offset))
+                .unwrap_or(next_offset)
+        } else {
+            next_offset
+        }
+    }
     pub(crate) fn get_longest_common_prefix<K: ?Sized + BorrowedBytes>(
         &self,
         key: &K,

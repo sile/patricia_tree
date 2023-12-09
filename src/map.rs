@@ -219,6 +219,32 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
         Some((K::Borrowed::from_bytes(key), value))
     }
 
+    /// Returns the longest common prefix length of `key` and the keys in this map.
+    ///
+    /// Unlike `get_longest_common_prefix()`, this method does not check if there is a key that matches the prefix in this map.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    ///
+    /// let mut map = PatriciaMap::new();
+    /// map.insert("foo", 1);
+    /// map.insert("foobar", 2);
+    /// assert_eq!(map.longest_common_prefix_len("fo"), 2);
+    /// assert_eq!(map.longest_common_prefix_len("foo"), 3);
+    /// assert_eq!(map.longest_common_prefix_len("fooba"), 5);
+    /// assert_eq!(map.longest_common_prefix_len("foobar"), 6);
+    /// assert_eq!(map.longest_common_prefix_len("foobarbaz"), 6);
+    /// assert_eq!(map.longest_common_prefix_len("foba"), 2);
+    /// ```
+    pub fn longest_common_prefix_len<Q>(&self, key: &Q) -> usize
+    where
+        Q: ?Sized + AsRef<K::Borrowed>,
+    {
+        self.tree.longest_common_prefix_len(key.as_ref())
+    }
+
     /// Inserts a key-value pair into this map.
     ///
     /// If the map did not have this key present, `None` is returned.

@@ -143,6 +143,32 @@ impl<T: Bytes> GenericPatriciaSet<T> {
         self.map.get_longest_common_prefix(value).map(|x| x.0)
     }
 
+    /// Returns the longest common prefix length of `value` and the elements in this set.
+    ///
+    /// Unlike `get_longest_common_prefix()`, this method does not check if there is a element that matches the prefix in this set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaSet;
+    ///
+    /// let mut set = PatriciaSet::new();
+    /// set.insert("foo");
+    /// set.insert("foobar");
+    /// assert_eq!(set.longest_common_prefix_len("fo"), 2);
+    /// assert_eq!(set.longest_common_prefix_len("foo"), 3);
+    /// assert_eq!(set.longest_common_prefix_len("fooba"), 5);
+    /// assert_eq!(set.longest_common_prefix_len("foobar"), 6);
+    /// assert_eq!(set.longest_common_prefix_len("foobarbaz"), 6);
+    /// assert_eq!(set.longest_common_prefix_len("foba"), 2);
+    /// ```
+    pub fn longest_common_prefix_len<U>(&self, value: &U) -> usize
+    where
+        U: ?Sized + AsRef<T::Borrowed>,
+    {
+        self.map.longest_common_prefix_len(value)
+    }
+
     /// Adds a value to this set.
     ///
     /// If the set did not have this value present, `true` is returned.
