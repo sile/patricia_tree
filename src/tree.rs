@@ -54,10 +54,7 @@ impl<V> PatriciaTree<V> {
             .get_longest_common_prefix_mut(key, 0)
             .map(|(n, v)| (&key.as_bytes()[..n], v))
     }
-    pub fn iter_prefix<'a, 'b, K: ?Sized + BorrowedBytes>(
-        &'a self,
-        prefix: &'b K,
-    ) -> Option<(usize, Nodes<V>)> {
+    pub fn iter_prefix<K: ?Sized + BorrowedBytes>(&self, prefix: &K) -> Option<(usize, Nodes<V>)> {
         if let Some((common_prefix_len, node)) = self.root.get_prefix_node(prefix) {
             let nodes = Nodes {
                 nodes: node.iter_descendant(),
@@ -68,9 +65,9 @@ impl<V> PatriciaTree<V> {
             None
         }
     }
-    pub fn iter_prefix_mut<'a, 'b, K: ?Sized + BorrowedBytes>(
-        &'a mut self,
-        prefix: &'b K,
+    pub fn iter_prefix_mut<K: ?Sized + BorrowedBytes>(
+        &mut self,
+        prefix: &K,
     ) -> Option<(usize, NodesMut<V>)> {
         if let Some((common_prefix_len, node)) = self.root.get_prefix_node_mut(prefix) {
             let nodes = NodesMut {

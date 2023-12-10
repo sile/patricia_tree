@@ -101,7 +101,7 @@ impl<V> Node<V> {
                 handle_alloc_error(layout)
             }
 
-            ptr::write(ptr.offset(FLAGS_OFFSET), flags.bits() as u8);
+            ptr::write(ptr.offset(FLAGS_OFFSET), flags.bits());
             ptr::write(ptr.offset(LABEL_LEN_OFFSET), label.len() as u8);
             ptr::copy_nonoverlapping(label.as_ptr(), ptr.offset(LABEL_OFFSET), label.len());
 
@@ -631,7 +631,7 @@ impl<V> Node<V> {
     fn set_flags(&mut self, other: Flags, value: bool) {
         let mut flags = self.flags();
         flags.set(other, value);
-        unsafe { ptr::write(self.ptr, flags.bits() as u8) };
+        unsafe { ptr::write(self.ptr, flags.bits()) };
     }
     fn label_len(&self) -> usize {
         unsafe { *self.ptr.offset(LABEL_LEN_OFFSET) as usize }
