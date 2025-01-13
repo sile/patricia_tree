@@ -1,5 +1,3 @@
-# Based on https://github.com/actions-rs/meta/blob/master/recipes/quickstart.md
-
 name: CI
 
 on: [push]
@@ -13,20 +11,9 @@ jobs:
         toolchain: [stable, beta, nightly]
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v1
-
-      - name: Install ${{ matrix.toolchain }} toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-
-      - name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-features --all
+        uses: actions/checkout@v4
+      - run: rustup update ${{ matrix.toolchain }}
+      - run: cargo check --all-features --all
 
   test:
     name: Test Suite
@@ -36,20 +23,9 @@ jobs:
         toolchain: [stable, beta, nightly]
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v1
-
-      - name: Install ${{ matrix.toolchain }} toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-
-      - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-features --all
+        uses: actions/checkout@v4
+      - run: rustup update ${{ matrix.toolchain }}
+      - run: cargo test --all-features --all
 
   lints:
     name: Lints
@@ -59,25 +35,7 @@ jobs:
         toolchain: [stable, beta, nightly]
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v1
-
-      - name: Install ${{ matrix.toolchain }} toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-          components: rustfmt, clippy
-
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-
-      # [NOTE] Clippy check fails due to a tool's bug
-      # - name: Run cargo clippy
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: clippy
-      #     args: --all-features --all -- -D warnings
+        uses: actions/checkout@v4
+      - run: rustup update ${{ matrix.toolchain }}
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-features --all -- -D warnings
