@@ -633,13 +633,16 @@ impl<K: Bytes, V> Iterator for IntoIter<K, V> {
 pub struct IterMut<'a, K, V: 'a> {
     nodes: tree::NodesMut<'a, V>,
     key_bytes: Vec<u8>,
+    key_offset: usize,
     _key: PhantomData<K>,
 }
 impl<'a, K, V: 'a> IterMut<'a, K, V> {
     fn new(nodes: tree::NodesMut<'a, V>, key: Vec<u8>) -> Self {
+        let key_offset = key.len();
         Self {
             nodes,
             key_bytes: key,
+            key_offset,
             _key: PhantomData,
         }
     }
@@ -648,7 +651,7 @@ impl<'a, K: Bytes, V: 'a> Iterator for IterMut<'a, K, V> {
     type Item = (K, &'a mut V);
     fn next(&mut self) -> Option<Self::Item> {
         for (key_len, node) in &mut self.nodes {
-            self.key_bytes.truncate(key_len);
+            self.key_bytes.truncate(self.key_offset + key_len);
             self.key_bytes.extend(node.label());
             if let Some(value) = node.into_value_mut() {
                 return Some((K::Borrowed::from_bytes(&self.key_bytes).to_owned(), value));
@@ -998,7 +1001,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "bug causing assertion failure"]
     fn issue42_iter_prefix_mut() {
         let mut map = StringPatriciaMap::new();
         map.insert("a0/b0", 0);
