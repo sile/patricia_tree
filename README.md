@@ -4,7 +4,6 @@ patricia_tree
 [![patricia_tree](https://img.shields.io/crates/v/patricia_tree.svg)](https://crates.io/crates/patricia_tree)
 [![Documentation](https://docs.rs/patricia_tree/badge.svg)](https://docs.rs/patricia_tree)
 [![Actions Status](https://github.com/sile/patricia_tree/workflows/CI/badge.svg)](https://github.com/sile/patricia_tree/actions)
-[![Coverage Status](https://coveralls.io/repos/github/sile/patricia_tree/badge.svg?branch=master)](https://coveralls.io/github/sile/patricia_tree?branch=master)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Memory-efficient data structures based on patricia tree (a.k.a, radix tree).

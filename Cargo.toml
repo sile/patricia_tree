@@ -11,9 +11,6 @@ categories = ["data-structures"]
 license = "MIT"
 edition = "2021"
 
-[badges]
-coveralls = { repository = "sile/patricia_tree" }
-
 [dependencies]
 bitflags = "2"
 serde = { version = "1", optional = true }
