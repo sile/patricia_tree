@@ -306,7 +306,6 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
         key: &'b Q,
     ) -> CommonPrefixesIter<'a, 'b, K::Borrowed, V>
     where
-        'a: 'b,
         Q: ?Sized + AsRef<K::Borrowed>,
     {
         CommonPrefixesIter {
@@ -333,10 +332,13 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefix_values<'a, 'b, Q>(&'a self, key: &'b Q) -> impl 'a + Iterator<Item = &'a V>
+    pub fn common_prefix_values<'a, 'b, Q>(
+        &'a self,
+        key: &'b Q,
+    ) -> impl Iterator<Item = &'a V> + use<'a, 'b, Q, K, V>
     where
-        'b: 'a,
         Q: ?Sized + AsRef<K::Borrowed>,
+        <K as Bytes>::Borrowed: 'b,
     {
         self.tree
             .common_prefixes(key.as_ref())
@@ -479,10 +481,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     pub fn iter_prefix<'a, 'b>(
         &'a self,
         prefix: &'b K::Borrowed,
-    ) -> impl 'a + Iterator<Item = (K, &'a V)>
-    where
-        'b: 'a,
-    {
+    ) -> impl Iterator<Item = (K, &'a V)> + use<'a, 'b, K, V> {
         self.tree
             .iter_prefix(prefix)
             .into_iter()
@@ -506,10 +505,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     pub fn iter_prefix_mut<'a, 'b>(
         &'a mut self,
         prefix: &'b K::Borrowed,
-    ) -> impl 'a + Iterator<Item = (K, &'a mut V)>
-    where
-        'b: 'a,
-    {
+    ) -> impl Iterator<Item = (K, &'a mut V)> + use<'a, 'b, K, V> {
         self.tree
             .iter_prefix_mut(prefix)
             .into_iter()
@@ -986,5 +982,44 @@ mod tests {
 
         assert_eq!(map.get("インターポール"), Some(&1));
         assert_eq!(map.get("インターポル"), Some(&2));
+    }
+
+    #[test]
+    fn issue42_iter_prefix() {
+        let mut map = StringPatriciaMap::new();
+        map.insert("a0/b0", 0);
+        map.insert("a1/b1", 0);
+        let items: Vec<_> = {
+            let prefix = "a0".to_owned();
+            map.iter_prefix(&prefix).collect()
+        };
+
+        assert_eq!(items, vec![("a0/b0".to_owned(), &0)])
+    }
+
+    #[test]
+    fn issue42_iter_prefix_mut() {
+        let mut map = StringPatriciaMap::new();
+        map.insert("a0/b0", 0);
+        map.insert("a1/b1", 0);
+        let items: Vec<_> = {
+            let prefix = "a0".to_owned();
+            map.iter_prefix_mut(&prefix).collect()
+        };
+
+        assert_eq!(items, vec![("a0/b0".to_owned(), &mut 0)])
+    }
+
+    #[test]
+    fn issue42_common_prefix_values() {
+        let mut map = StringPatriciaMap::new();
+        map.insert("a0/b0", 0);
+        map.insert("a1/b1", 0);
+        let items: Vec<_> = {
+            let prefix = "a0/b0/c0".to_owned();
+            map.common_prefix_values(&prefix).collect()
+        };
+
+        assert_eq!(items, vec![&0])
     }
 }
