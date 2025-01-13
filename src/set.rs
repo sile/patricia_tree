@@ -320,7 +320,7 @@ impl<T: Bytes, U: AsRef<T::Borrowed>> Extend<U> for GenericPatriciaSet<T> {
 /// An Iterator over a `PatriciaSet`'s items.
 #[derive(Debug)]
 pub struct Iter<'a, T>(map::Keys<'a, T, ()>);
-impl<'a, T: Bytes> Iterator for Iter<'a, T> {
+impl<T: Bytes> Iterator for Iter<'_, T> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()

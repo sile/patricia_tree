@@ -559,17 +559,15 @@ impl<V> Node<V> {
         } else if common_prefix_len == self.label().len() {
             self.child_mut()
                 .and_then(|child| child.split_by_prefix(next, level + 1))
-                .map(|old| {
+                .inspect(|_old| {
                     self.try_reclaim_child();
                     self.try_merge_with_child(level);
-                    old
                 })
         } else if common_prefix_len == 0 && prefix.cmp_first_item(self.label()).is_ge() {
             self.sibling_mut()
                 .and_then(|sibling| sibling.split_by_prefix(next, level))
-                .map(|old| {
+                .inspect(|_old| {
                     self.try_reclaim_sibling();
-                    old
                 })
         } else {
             None
@@ -579,25 +577,22 @@ impl<V> Node<V> {
         let (next, common_prefix_len) = key.strip_common_prefix_and_len(self.label());
         if common_prefix_len == self.label().len() {
             if next.is_empty() {
-                self.take_value().map(|old| {
+                self.take_value().inspect(|_old| {
                     self.try_merge_with_child(level);
-                    old
                 })
             } else {
                 self.child_mut()
                     .and_then(|child| child.remove(next, level + 1))
-                    .map(|old| {
+                    .inspect(|_old| {
                         self.try_reclaim_child();
                         self.try_merge_with_child(level);
-                        old
                     })
             }
         } else if common_prefix_len == 0 && key.cmp_first_item(self.label()).is_ge() {
             self.sibling_mut()
                 .and_then(|sibling| sibling.remove(next, level))
-                .map(|old| {
+                .inspect(|_old| {
                     self.try_reclaim_sibling();
-                    old
                 })
         } else {
             None
@@ -880,7 +875,7 @@ pub(crate) struct CommonPrefixesIter<'a, 'b, K: ?Sized, V> {
     stack: Vec<(usize, &'a Node<V>)>,
 }
 
-impl<'a, 'b, K, V> Iterator for CommonPrefixesIter<'a, 'b, K, V>
+impl<'a, K, V> Iterator for CommonPrefixesIter<'a, '_, K, V>
 where
     K: ?Sized + BorrowedBytes,
 {

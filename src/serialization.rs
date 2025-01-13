@@ -143,7 +143,7 @@ impl<'de, K: crate::Bytes, V: Deserialize<'de>> Deserialize<'de> for KeyAndNode<
             let mut node = Node::<V>::new_for_decoding(flags, label_len as u8);
             node.label_mut().copy_from_slice(&tree_bytes[..label_len]);
             if !K::Borrowed::is_valid_bytes(node.label()) {
-                return Err(D::Error::custom(&format!(
+                return Err(D::Error::custom(format!(
                     "malformed label bytes: {:?}",
                     node.label()
                 )));
@@ -194,7 +194,7 @@ impl<'de, K: crate::Bytes, V: Deserialize<'de>> Deserialize<'de> for KeyAndNode<
 
 struct Bytes<'a>(Cow<'a, [u8]>);
 
-impl<'a> Serialize for Bytes<'a> {
+impl Serialize for Bytes<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
