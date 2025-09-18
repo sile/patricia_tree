@@ -9,8 +9,8 @@ readme = "README.md"
 keywords = ["patricia", "radix", "trie", "no_std"]
 categories = ["data-structures"]
 license = "MIT"
-edition = "2021"
-rust-version = "1.82.0"
+edition = "2024"
+rust-version = "1.85.0"
 
 [dependencies]
 bitflags = { version = "2", default-features = false }
@@ -18,7 +18,7 @@ serde = { version = "1", optional = true }
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }
-rand = "0.8"
+rand = "0.9"
 serde_json = { version = "1" }
 
 [features]
