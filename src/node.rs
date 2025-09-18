@@ -16,15 +16,15 @@ macro_rules! assert_some {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Flags(u8);
+pub(crate) struct Flags(u8);
 
 impl Flags {
-    const VALUE_ALLOCATED: Flags = Flags(0b0000_0001);
-    const VALUE_INITIALIZED: Flags = Flags(0b0000_0010);
-    const CHILD_ALLOCATED: Flags = Flags(0b0000_0100);
-    const CHILD_INITIALIZED: Flags = Flags(0b0000_1000);
-    const SIBLING_ALLOCATED: Flags = Flags(0b0001_0000);
-    const SIBLING_INITIALIZED: Flags = Flags(0b0010_0000);
+    pub(crate) const VALUE_ALLOCATED: Flags = Flags(0b0000_0001);
+    pub(crate) const VALUE_INITIALIZED: Flags = Flags(0b0000_0010);
+    pub(crate) const CHILD_ALLOCATED: Flags = Flags(0b0000_0100);
+    pub(crate) const CHILD_INITIALIZED: Flags = Flags(0b0000_1000);
+    pub(crate) const SIBLING_ALLOCATED: Flags = Flags(0b0001_0000);
+    pub(crate) const SIBLING_INITIALIZED: Flags = Flags(0b0010_0000);
 
     const VALID_BITS_MASK: u8 = 0b0011_1111; // Mask of all valid flag bits.
 
@@ -32,15 +32,15 @@ impl Flags {
         Flags(0)
     }
 
-    const fn from_bits_truncate(bits: u8) -> Self {
+    pub(crate) const fn from_bits_truncate(bits: u8) -> Self {
         Flags(bits & Self::VALID_BITS_MASK)
     }
 
-    const fn bits(self) -> u8 {
+    pub(crate) const fn bits(self) -> u8 {
         self.0
     }
 
-    const fn contains(self, other: Flags) -> bool {
+    pub(crate) const fn contains(self, other: Flags) -> bool {
         (self.0 & other.0) == other.0
     }
 
@@ -681,7 +681,7 @@ impl<V> Node<V> {
             None
         }
     }
-    fn flags(&self) -> Flags {
+    pub(crate) fn flags(&self) -> Flags {
         Flags::from_bits_truncate(unsafe { *self.ptr })
     }
     fn set_flags(&mut self, other: Flags, value: bool) {
