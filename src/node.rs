@@ -1,14 +1,9 @@
 //! A node which represents a subtree of a patricia tree.
 use crate::BorrowedBytes;
-use alloc::alloc::alloc;
-use alloc::alloc::dealloc;
-use alloc::alloc::handle_alloc_error;
-use alloc::alloc::Layout;
+use alloc::alloc::{alloc, dealloc, handle_alloc_error, Layout};
 use alloc::vec::Vec;
 use core::marker::PhantomData;
-use core::mem;
-use core::ptr;
-use core::slice;
+use core::{mem, ptr, slice};
 
 macro_rules! assert_some {
     ($expr:expr) => {

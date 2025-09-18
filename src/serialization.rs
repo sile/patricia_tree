@@ -1,7 +1,6 @@
 use crate::node::{Flags, Node};
 use crate::{BorrowedBytes, GenericPatriciaMap, GenericPatriciaSet};
-use alloc::borrow::Cow;
-use alloc::borrow::ToOwned;
+use alloc::borrow::{Cow, ToOwned};
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 use core::marker::PhantomData;
