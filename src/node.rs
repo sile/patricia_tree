@@ -26,12 +26,15 @@ impl Flags {
     pub const SIBLING_ALLOCATED: Flags = Flags(0b0001_0000);
     pub const SIBLING_INITIALIZED: Flags = Flags(0b0010_0000);
 
+    /// Mask of all valid flag bits.
+    const VALID_BITS_MASK: u8 = 0b0011_1111;
+
     pub const fn empty() -> Self {
         Flags(0)
     }
 
     pub const fn from_bits_truncate(bits: u8) -> Self {
-        Flags(bits)
+        Flags(bits & Self::VALID_BITS_MASK)
     }
 
     pub const fn bits(self) -> u8 {
