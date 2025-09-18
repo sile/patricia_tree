@@ -15,17 +15,57 @@ macro_rules! assert_some {
     };
 }
 
-bitflags! {
-    #[derive(Clone, Copy)]
-    pub (crate) struct Flags: u8 {
-        const VALUE_ALLOCATED = 0b0000_0001;
-        const VALUE_INITIALIZED = 0b0000_0010;
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Flags(u8);
 
-        const CHILD_ALLOCATED = 0b0000_0100;
-        const CHILD_INITIALIZED = 0b0000_1000;
+impl Flags {
+    pub(crate) const VALUE_ALLOCATED: Flags = Flags(0b0000_0001);
+    pub(crate) const VALUE_INITIALIZED: Flags = Flags(0b0000_0010);
+    pub(crate) const CHILD_ALLOCATED: Flags = Flags(0b0000_0100);
+    pub(crate) const CHILD_INITIALIZED: Flags = Flags(0b0000_1000);
+    pub(crate) const SIBLING_ALLOCATED: Flags = Flags(0b0001_0000);
+    pub(crate) const SIBLING_INITIALIZED: Flags = Flags(0b0010_0000);
 
-        const SIBLING_ALLOCATED = 0b0001_0000;
-        const SIBLING_INITIALIZED = 0b0010_0000;
+    const VALID_BITS_MASK: u8 = 0b0011_1111; // Mask of all valid flag bits.
+
+    const fn empty() -> Self {
+        Flags(0)
+    }
+
+    pub(crate) const fn from_bits_truncate(bits: u8) -> Self {
+        Flags(bits & Self::VALID_BITS_MASK)
+    }
+
+    pub(crate) const fn bits(self) -> u8 {
+        self.0
+    }
+
+    pub(crate) const fn contains(self, other: Flags) -> bool {
+        (self.0 & other.0) == other.0
+    }
+
+    const fn intersects(self, other: Flags) -> bool {
+        (self.0 & other.0) != 0
+    }
+
+    fn insert(&mut self, other: Flags) {
+        self.0 |= other.0;
+    }
+
+    fn set(&mut self, other: Flags, value: bool) {
+        if value {
+            self.0 |= other.0;
+        } else {
+            self.0 &= !other.0;
+        }
+    }
+}
+
+impl core::ops::BitOr for Flags {
+    type Output = Self;
+
+    fn bitor(self, other: Self) -> Self {
+        Flags(self.0 | other.0)
     }
 }
 
