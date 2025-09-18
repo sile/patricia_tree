@@ -1,8 +1,8 @@
 //! A set based on a patricia tree.
+use crate::Bytes;
 use crate::map::{self, GenericPatriciaMap};
 #[cfg(any(feature = "serde", test))]
 use crate::node::Node;
-use crate::Bytes;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
@@ -246,7 +246,7 @@ impl<T: Bytes> GenericPatriciaSet<T> {
     ///
     /// assert_eq!(set.iter().collect::<Vec<_>>(), [Vec::from("bar"), "baz".into(), "foo".into()]);
     /// ```
-    pub fn iter(&self) -> Iter<T> {
+    pub fn iter(&self) -> Iter<'_, T> {
         Iter(self.map.keys())
     }
 }

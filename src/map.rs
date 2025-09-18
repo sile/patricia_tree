@@ -391,7 +391,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(vec![(Vec::from("bar"), &2), ("baz".into(), &3), ("foo".into(), &1)],
     ///            map.iter().collect::<Vec<_>>());
     /// ```
-    pub fn iter(&self) -> Iter<K, V> {
+    pub fn iter(&self) -> Iter<'_, K, V> {
         Iter::new(self.tree.nodes(), Vec::new())
     }
 
@@ -409,7 +409,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// }
     /// assert_eq!(map.get("bar"), Some(&12));
     /// ```
-    pub fn iter_mut(&mut self) -> IterMut<K, V> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
         IterMut::new(self.tree.nodes_mut(), Vec::new())
     }
 
@@ -425,7 +425,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(vec![Vec::from("bar"), "baz".into(), "foo".into()],
     ///            map.keys().collect::<Vec<_>>());
     /// ```
-    pub fn keys(&self) -> Keys<K, V> {
+    pub fn keys(&self) -> Keys<'_, K, V> {
         Keys(self.iter())
     }
 
@@ -441,7 +441,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(vec![2, 3, 1],
     ///            map.values().cloned().collect::<Vec<_>>());
     /// ```
-    pub fn values(&self) -> Values<V> {
+    pub fn values(&self) -> Values<'_, V> {
         Values {
             nodes: self.tree.nodes(),
         }
@@ -462,7 +462,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(vec![12, 13, 11],
     ///            map.values().cloned().collect::<Vec<_>>());
     /// ```
-    pub fn values_mut(&mut self) -> ValuesMut<V> {
+    pub fn values_mut(&mut self) -> ValuesMut<'_, V> {
         ValuesMut {
             nodes: self.tree.nodes_mut(),
         }
