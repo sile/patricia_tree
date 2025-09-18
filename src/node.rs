@@ -16,7 +16,7 @@ macro_rules! assert_some {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Flags(u8);
+struct Flags(u8);
 
 impl Flags {
     const VALUE_ALLOCATED: Flags = Flags(0b0000_0001);
@@ -28,31 +28,31 @@ impl Flags {
 
     const VALID_BITS_MASK: u8 = 0b0011_1111; // Mask of all valid flag bits.
 
-    pub const fn empty() -> Self {
+    const fn empty() -> Self {
         Flags(0)
     }
 
-    pub const fn from_bits_truncate(bits: u8) -> Self {
+    const fn from_bits_truncate(bits: u8) -> Self {
         Flags(bits & Self::VALID_BITS_MASK)
     }
 
-    pub const fn bits(self) -> u8 {
+    const fn bits(self) -> u8 {
         self.0
     }
 
-    pub const fn contains(self, other: Flags) -> bool {
+    const fn contains(self, other: Flags) -> bool {
         (self.0 & other.0) == other.0
     }
 
-    pub const fn intersects(self, other: Flags) -> bool {
+    const fn intersects(self, other: Flags) -> bool {
         (self.0 & other.0) != 0
     }
 
-    pub fn insert(&mut self, other: Flags) {
+    fn insert(&mut self, other: Flags) {
         self.0 |= other.0;
     }
 
-    pub fn set(&mut self, other: Flags, value: bool) {
+    fn set(&mut self, other: Flags, value: bool) {
         if value {
             self.0 |= other.0;
         } else {
@@ -681,7 +681,7 @@ impl<V> Node<V> {
             None
         }
     }
-    pub(crate) fn flags(&self) -> Flags {
+    fn flags(&self) -> Flags {
         Flags::from_bits_truncate(unsafe { *self.ptr })
     }
     fn set_flags(&mut self, other: Flags, value: bool) {
