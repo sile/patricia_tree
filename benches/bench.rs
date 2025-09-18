@@ -37,7 +37,7 @@ fn bench_removal(b: &mut test::Bencher) {
     }
 
     let mut values = (0..MAX).collect::<Vec<_>>();
-    values.shuffle(&mut rand::thread_rng());
+    values.shuffle(&mut rand::rng());
 
     let mut values = values.iter().cycle();
     b.iter(|| {
