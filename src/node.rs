@@ -19,15 +19,14 @@ macro_rules! assert_some {
 pub(crate) struct Flags(u8);
 
 impl Flags {
-    pub const VALUE_ALLOCATED: Flags = Flags(0b0000_0001);
-    pub const VALUE_INITIALIZED: Flags = Flags(0b0000_0010);
-    pub const CHILD_ALLOCATED: Flags = Flags(0b0000_0100);
-    pub const CHILD_INITIALIZED: Flags = Flags(0b0000_1000);
-    pub const SIBLING_ALLOCATED: Flags = Flags(0b0001_0000);
-    pub const SIBLING_INITIALIZED: Flags = Flags(0b0010_0000);
+    const VALUE_ALLOCATED: Flags = Flags(0b0000_0001);
+    const VALUE_INITIALIZED: Flags = Flags(0b0000_0010);
+    const CHILD_ALLOCATED: Flags = Flags(0b0000_0100);
+    const CHILD_INITIALIZED: Flags = Flags(0b0000_1000);
+    const SIBLING_ALLOCATED: Flags = Flags(0b0001_0000);
+    const SIBLING_INITIALIZED: Flags = Flags(0b0010_0000);
 
-    /// Mask of all valid flag bits.
-    const VALID_BITS_MASK: u8 = 0b0011_1111;
+    const VALID_BITS_MASK: u8 = 0b0011_1111; // Mask of all valid flag bits.
 
     pub const fn empty() -> Self {
         Flags(0)
