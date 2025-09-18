@@ -1,22 +1,29 @@
-use clap::Parser;
 use patricia_tree::PatriciaSet;
 use std::collections::{BTreeSet, HashSet};
 use std::io::BufRead;
 
-#[derive(Parser)]
-struct Args {
-    #[clap(
-        long,
-        default_value = "patricia",
-        value_parser = clap::builder::PossibleValuesParser::new(["patricia", "hash", "btree", "count"])
-    )]
-    kind: String,
-}
+fn main() -> noargs::Result<()> {
+    let mut args = noargs::raw_args();
+    noargs::HELP_FLAG.take_help(&mut args);
 
-fn main() {
-    let args = Args::parse();
+    let kind = noargs::opt("kind")
+        .doc("Data structure kindt")
+        .ty("patricia | hash | btree | count")
+        .default("patricia")
+        .take(&mut args)
+        .then(|a| {
+            let value = a.value();
+            match value {
+                "patricia" | "hash" | "btree" | "count" => Ok(value.to_string()),
+                _ => Err("must be one of: patricia, hash, btree, count"),
+            }
+        })?;
+    if let Some(help) = args.finish()? {
+        print!("{help}");
+        return Ok(());
+    }
 
-    match args.kind.as_str() {
+    match kind.as_str() {
         "patricia" => {
             let mut set = PatriciaSet::new();
             each_line(|line| {
@@ -47,6 +54,8 @@ fn main() {
         }
         _ => unreachable!(),
     }
+
+    Ok(())
 }
 
 fn each_line<F>(mut f: F)

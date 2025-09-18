@@ -815,7 +815,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn large_map_works() {
         let mut input = (0..10000).map(|i| (i.to_string(), i)).collect::<Vec<_>>();
-        input.shuffle(&mut rand::thread_rng());
+        input.shuffle(&mut rand::rng());
 
         // Insert
         let mut map = input.iter().cloned().collect::<PatriciaMap<_>>();
