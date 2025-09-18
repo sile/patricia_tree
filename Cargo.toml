@@ -9,8 +9,8 @@ readme = "README.md"
 keywords = ["patricia", "radix", "trie", "no_std"]
 categories = ["data-structures"]
 license = "MIT"
-edition = "2021"
-rust-version = "1.82.0"
+edition = "2024"
+rust-version = "1.85.0"
 
 [dependencies]
 bitflags = { version = "2", default-features = false }
