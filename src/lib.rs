@@ -24,13 +24,20 @@
 //! ```
 #![warn(missing_docs)]
 #![allow(clippy::cast_ptr_alignment)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 #[macro_use]
 extern crate bitflags;
 #[cfg(test)]
 extern crate rand;
 
-use std::cmp::Ordering;
+#[macro_use]
+extern crate alloc;
+
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::cmp::Ordering;
 
 pub use map::{GenericPatriciaMap, PatriciaMap, StringPatriciaMap};
 pub use set::{GenericPatriciaSet, PatriciaSet, StringPatriciaSet};
@@ -129,11 +136,11 @@ impl BorrowedBytes for str {
     }
 
     fn is_valid_bytes(bytes: &[u8]) -> bool {
-        std::str::from_utf8(bytes).is_ok()
+        core::str::from_utf8(bytes).is_ok()
     }
 
     fn from_bytes(bytes: &[u8]) -> &Self {
-        std::str::from_utf8(bytes).expect("unreachable")
+        core::str::from_utf8(bytes).expect("unreachable")
     }
 
     fn strip_common_prefix(&self, bytes: &[u8]) -> &Self {
