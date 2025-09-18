@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 
 use crate::{
-    node::{self, Node, NodeMut},
     BorrowedBytes,
+    node::{self, Node, NodeMut},
 };
 
 #[derive(Debug, Clone)]
@@ -59,7 +59,10 @@ impl<V> PatriciaTree<V> {
             .get_longest_common_prefix_mut(key, 0)
             .map(|(n, v)| (&key.as_bytes()[..n], v))
     }
-    pub fn iter_prefix<K: ?Sized + BorrowedBytes>(&self, prefix: &K) -> Option<(usize, Nodes<V>)> {
+    pub fn iter_prefix<K: ?Sized + BorrowedBytes>(
+        &self,
+        prefix: &K,
+    ) -> Option<(usize, Nodes<'_, V>)> {
         if let Some((common_prefix_len, node)) = self.root.get_prefix_node(prefix) {
             let nodes = Nodes {
                 nodes: node.iter_descendant(),
@@ -73,7 +76,7 @@ impl<V> PatriciaTree<V> {
     pub fn iter_prefix_mut<K: ?Sized + BorrowedBytes>(
         &mut self,
         prefix: &K,
-    ) -> Option<(usize, NodesMut<V>)> {
+    ) -> Option<(usize, NodesMut<'_, V>)> {
         if let Some((common_prefix_len, node)) = self.root.get_prefix_node_mut(prefix) {
             let nodes = NodesMut {
                 nodes: node.iter_descendant_mut(),
@@ -119,13 +122,13 @@ impl<V> PatriciaTree<V> {
     pub fn len(&self) -> usize {
         self.len
     }
-    pub fn nodes(&self) -> Nodes<V> {
+    pub fn nodes(&self) -> Nodes<'_, V> {
         Nodes {
             nodes: self.root.iter(),
             label_lens: Vec::new(),
         }
     }
-    pub fn nodes_mut(&mut self) -> NodesMut<V> {
+    pub fn nodes_mut(&mut self) -> NodesMut<'_, V> {
         NodesMut {
             nodes: self.root.iter_mut(),
             label_lens: Vec::new(),

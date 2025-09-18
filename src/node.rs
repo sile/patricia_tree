@@ -1,6 +1,6 @@
 //! A node which represents a subtree of a patricia tree.
 use crate::BorrowedBytes;
-use alloc::alloc::{alloc, dealloc, handle_alloc_error, Layout};
+use alloc::alloc::{Layout, alloc, dealloc, handle_alloc_error};
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use core::{mem, ptr, slice};
@@ -370,26 +370,26 @@ impl<V> Node<V> {
     }
 
     /// Gets an iterator which traverses the nodes in this tree, in depth first order.
-    pub fn iter(&self) -> Iter<V> {
+    pub fn iter(&self) -> Iter<'_, V> {
         Iter {
             stack: vec![(0, self)],
         }
     }
 
     /// Gets a mutable iterator which traverses the nodes in this tree, in depth first order.
-    pub fn iter_mut(&mut self) -> IterMut<V> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, V> {
         IterMut {
             stack: vec![(0, self)],
         }
     }
 
-    pub(crate) fn iter_descendant(&self) -> Iter<V> {
+    pub(crate) fn iter_descendant(&self) -> Iter<'_, V> {
         Iter {
             stack: vec![(0, self)],
         }
     }
 
-    pub(crate) fn iter_descendant_mut(&mut self) -> IterMut<V> {
+    pub(crate) fn iter_descendant_mut(&mut self) -> IterMut<'_, V> {
         IterMut {
             stack: vec![(0, self)],
         }
