@@ -15,6 +15,18 @@ jobs:
       - run: rustup update ${{ matrix.toolchain }}
       - run: cargo check --all-features --all
 
+  nostd:
+    name: Check no_std
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain: [stable, beta, nightly]
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - run: rustup update ${{ matrix.toolchain }}
+      - run: cargo check --no-default-features --features=serde --all
+
   test:
     name: Test Suite
     runs-on: ubuntu-latest

@@ -4,9 +4,12 @@ use crate::node;
 use crate::node::Node;
 use crate::tree::{self, PatriciaTree};
 use crate::{BorrowedBytes, Bytes};
-use std::fmt;
-use std::iter::FromIterator;
-use std::marker::PhantomData;
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::fmt;
+use core::iter::FromIterator;
+use core::marker::PhantomData;
 
 /// Patricia tree based map with [`Vec<u8>`] as key.
 pub type PatriciaMap<V> = GenericPatriciaMap<Vec<u8>, V>;

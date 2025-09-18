@@ -3,8 +3,10 @@ use crate::map::{self, GenericPatriciaMap};
 #[cfg(any(feature = "serde", test))]
 use crate::node::Node;
 use crate::Bytes;
-use std::fmt;
-use std::iter::FromIterator;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::fmt;
+use core::iter::FromIterator;
 
 /// Patricia tree based set with [`Vec<u8>`] as key.
 pub type PatriciaSet = GenericPatriciaSet<Vec<u8>>;

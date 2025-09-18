@@ -1,9 +1,12 @@
 use crate::node::{Flags, Node};
 use crate::{BorrowedBytes, GenericPatriciaMap, GenericPatriciaSet};
+use alloc::borrow::Cow;
+use alloc::borrow::ToOwned;
+use alloc::vec::Vec;
+use core::borrow::Borrow;
+use core::marker::PhantomData;
 use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::borrow::{Borrow, Cow};
-use std::marker::PhantomData;
 
 impl<T> Serialize for GenericPatriciaSet<T> {
     /// In order to serialize a [PatriciaSet], make sure you installed the crate
@@ -217,7 +220,7 @@ struct BytesVisitor;
 impl<'de> Visitor<'de> for BytesVisitor {
     type Value = Bytes<'de>;
 
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(formatter, "a byte string")
     }
 
