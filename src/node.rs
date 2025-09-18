@@ -15,7 +15,7 @@ macro_rules! assert_some {
     };
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct Flags(u8);
 
 impl Flags {
