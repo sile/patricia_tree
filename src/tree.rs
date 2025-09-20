@@ -96,6 +96,12 @@ impl<V> PatriciaTree<V> {
     {
         self.root.common_prefixes(key)
     }
+    pub(crate) fn common_prefixes_owned<'a>(
+        &'a self,
+        key: Vec<u8>,
+    ) -> node::CommonPrefixesIterOwned<'a, V> {
+        self.root.common_prefixes_owned(key)
+    }
     pub fn remove<K: ?Sized + BorrowedBytes>(&mut self, key: &K) -> Option<V> {
         if let Some(old) = self.root.remove(key, 0) {
             self.len -= 1;

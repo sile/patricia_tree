@@ -50,7 +50,7 @@ fn main() -> noargs::Result<()> {
             each_line(|_| {
                 count += 1;
             });
-            println!("# LINES: {}", count);
+            println!("# LINES: {count}");
         }
         _ => unreachable!(),
     }
