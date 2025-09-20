@@ -349,7 +349,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     }
 
     /// Returns an iterator that collects all values of entries in the map up to a certain key.
-    /// Takes ownership over key.
+    /// Takes owned key value so that iterator is not tied to key lifetime
     ///
     /// # Example
     ///
@@ -367,15 +367,15 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefix_values_owned<'a, Q>(
+    pub fn common_prefix_values_owned<'a>(
         &'a self,
-        key: &Q,
-    ) -> impl Iterator<Item = &'a V> + use<'a, Q, K, V>
+        key: K,
+    ) -> impl Iterator<Item = &'a V> + use<'a, K, V>
     where
-        Q: ?Sized + AsRef<K::Borrowed>,
+        K: AsRef<K::Borrowed>,
     {
         self.tree
-            .common_prefixes_owned(key.as_ref().as_bytes().to_owned())
+            .common_prefixes_owned(key)
             .filter_map(|(_, n)| n.value())
     }
     /// Splits the map into two at the given prefix.
@@ -1068,7 +1068,7 @@ mod tests {
                 domain: &[u8],
             ) -> impl Iterator<Item = &'a T> + use<'a, T> {
                 let domain = domain.to_vec();
-                self.map.common_prefix_values_owned(&domain)
+                self.map.common_prefix_values_owned(domain)
             }
         }
     }

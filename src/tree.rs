@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use crate::{
-    BorrowedBytes,
+    BorrowedBytes, Bytes,
     node::{self, Node, NodeMut},
 };
 
@@ -96,10 +96,13 @@ impl<V> PatriciaTree<V> {
     {
         self.root.common_prefixes(key)
     }
-    pub(crate) fn common_prefixes_owned<'a>(
+    pub(crate) fn common_prefixes_owned<'a, K>(
         &'a self,
-        key: Vec<u8>,
-    ) -> node::CommonPrefixesIterOwned<'a, V> {
+        key: K,
+    ) -> node::CommonPrefixesIterOwned<'a, K, V>
+    where
+        K: Bytes + AsRef<K::Borrowed>,
+    {
         self.root.common_prefixes_owned(key)
     }
     pub fn remove<K: ?Sized + BorrowedBytes>(&mut self, key: &K) -> Option<V> {

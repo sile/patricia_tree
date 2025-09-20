@@ -1,5 +1,5 @@
 //! A node which represents a subtree of a patricia tree.
-use crate::BorrowedBytes;
+use crate::{BorrowedBytes, Bytes};
 use alloc::alloc::{Layout, alloc, dealloc, handle_alloc_error};
 use alloc::vec::Vec;
 use core::marker::PhantomData;
@@ -448,10 +448,10 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn common_prefixes_owned<'a>(
+    pub(crate) fn common_prefixes_owned<'a, K: Bytes>(
         &'a self,
-        key: Vec<u8>,
-    ) -> CommonPrefixesIterOwned<'a, V> {
+        key: K,
+    ) -> CommonPrefixesIterOwned<'a, K, V> {
         CommonPrefixesIterOwned {
             key,
             stack: vec![(0, self)],
@@ -954,16 +954,19 @@ where
 /// An iterator over entries in that collects all values up to
 /// until the key stops matching.
 #[derive(Debug)]
-pub(crate) struct CommonPrefixesIterOwned<'a, V> {
-    key: Vec<u8>,
+pub(crate) struct CommonPrefixesIterOwned<'a, K, V> {
+    key: K,
     stack: Vec<(usize, &'a Node<V>)>,
 }
 
-impl<'a, V> Iterator for CommonPrefixesIterOwned<'a, V> {
+impl<'a, K, V> Iterator for CommonPrefixesIterOwned<'a, K, V>
+where
+    K: Bytes + AsRef<K::Borrowed>,
+{
     type Item = (usize, &'a Node<V>);
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((offset, node)) = self.stack.pop() {
-            let key = self.key.strip_n_prefix(offset);
+            let key = self.key.as_ref().strip_n_prefix(offset);
             let (_next, common_prefix_len) = key.strip_common_prefix_and_len(node.label());
             if common_prefix_len == 0 && key.cmp_first_item(node.label()).is_ge() {
                 if let Some(sibling) = node.sibling() {
