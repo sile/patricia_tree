@@ -1062,7 +1062,7 @@ mod tests {
         }
 
         impl<T> TestTrie<T> {
-            #[allow(dead_code)]
+            #[expect(dead_code)]
             fn common_prefix_test<'a>(
                 &'a self,
                 domain: &[u8],
