@@ -347,7 +347,7 @@ mod tests {
     fn debug_works() {
         let set: PatriciaSet = vec!["foo", "bar", "baz"].into_iter().collect();
         assert_eq!(
-            format!("{:?}", set),
+            format!("{set:?}"),
             "{[98, 97, 114], [98, 97, 122], [102, 111, 111]}"
         );
     }
