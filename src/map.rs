@@ -1056,7 +1056,7 @@ mod tests {
 
     #[test]
     fn test_owned_impl_iter() {
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         struct TestTrie<T> {
             map: GenericPatriciaMap<Vec<u8>, T>,
         }
