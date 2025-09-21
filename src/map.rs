@@ -363,7 +363,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// t.insert("abcd", vec!["d"]);
     /// t.insert("abcdf", vec!["f"]);
     /// assert!(t
-    ///     .common_prefix_values_owned(b"abcde")
+    ///     .common_prefix_values_owned(b"abcde".to_vec())
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
@@ -1056,7 +1056,6 @@ mod tests {
 
     #[test]
     fn test_owned_impl_iter() {
-        #[expect(dead_code)]
         struct TestTrie<T> {
             map: GenericPatriciaMap<Vec<u8>, T>,
         }
