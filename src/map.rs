@@ -348,6 +348,36 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
             .filter_map(|(_, n)| n.value())
     }
 
+    /// Returns an iterator that collects all values of entries in the map up to a certain key.
+    /// Takes owned key value so that iterator is not tied to key lifetime
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use patricia_tree::PatriciaMap;
+    /// let mut t = PatriciaMap::new();
+    /// t.insert("a", vec!["a"]);
+    /// t.insert("x", vec!["x"]);
+    /// t.insert("ab", vec!["b"]);
+    /// t.insert("abc", vec!["c"]);
+    /// t.insert("abcd", vec!["d"]);
+    /// t.insert("abcdf", vec!["f"]);
+    /// assert!(t
+    ///     .common_prefix_values_owned(b"abcde")
+    ///     .flatten()
+    ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
+    /// ```
+    pub fn common_prefix_values_owned<'a>(
+        &'a self,
+        key: K,
+    ) -> impl Iterator<Item = &'a V> + use<'a, K, V>
+    where
+        K: AsRef<K::Borrowed>,
+    {
+        self.tree
+            .common_prefixes_owned(key)
+            .filter_map(|(_, n)| n.value())
+    }
     /// Splits the map into two at the given prefix.
     ///
     /// The returned map contains all the entries of which keys are prefixed by `prefix`.
@@ -767,7 +797,7 @@ mod tests {
             .into_iter()
             .collect();
         assert_eq!(
-            format!("{:?}", map),
+            format!("{map:?}"),
             "{[98, 97, 114]: 2, [98, 97, 122]: 3, [102, 111, 111]: 1}"
         );
     }
@@ -831,7 +861,7 @@ mod tests {
             assert_eq!(map.remove(k), Some(v));
             assert_eq!(map.remove(k), None);
         }
-        for &(ref k, _) in input.iter().take(input.len() / 2) {
+        for (k, _) in input.iter().take(input.len() / 2) {
             assert_eq!(map.get(k), None);
         }
         for &(ref k, v) in input.iter().skip(input.len() / 2) {
@@ -863,8 +893,7 @@ mod tests {
 
         let results = t
             .common_prefixes(b".com.foo.bar.baz.")
-            .map(|(_, v)| v)
-            .flatten()
+            .flat_map(|(_, v)| v)
             .cloned()
             .collect::<Vec<_>>();
 
@@ -883,8 +912,7 @@ mod tests {
 
         let results = t
             .common_prefixes(b"abcde")
-            .map(|(_, v)| v)
-            .flatten()
+            .flat_map(|(_, v)| v)
             .cloned()
             .collect::<Vec<_>>();
         assert!(results.iter().eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
@@ -901,13 +929,12 @@ mod tests {
 
         let results = t
             .common_prefixes(b"abc")
-            .map(|(k, v)| {
+            .flat_map(|(k, v)| {
                 unsafe {
                     println!("{:?}", std::str::from_utf8_unchecked(k));
                 }
                 v
             })
-            .flatten()
             .cloned()
             .collect::<Vec<_>>();
         dbg!(&results);
@@ -922,15 +949,14 @@ mod tests {
 
         let results = t
             .common_prefixes(b"abcd")
-            .map(|(_, v)| v)
-            .flatten()
+            .flat_map(|(_, v)| v)
             .cloned()
             .collect::<Vec<_>>();
 
         assert!(results.iter().eq(vec![&"a", &"b", &"c"].into_iter()));
 
         let mut list = PatriciaMap::new();
-        list.insert(b".com.foocatnetworks.".as_ref(), vec![0 as u16]);
+        list.insert(b".com.foocatnetworks.".as_ref(), vec![0_u16]);
         list.insert(b".com.foocatnetworks.foo.".as_ref(), vec![1]);
         list.insert(b".com.foocatnetworks.foo.baz.".as_ref(), vec![2]);
         list.insert(b".com.google.".as_ref(), vec![0]);
@@ -939,12 +965,11 @@ mod tests {
 
         let results = list
             .common_prefixes(b".com.foocatnetworks.foo.baz.")
-            .map(|(_, v)| v)
-            .flatten()
+            .flat_map(|(_, v)| v)
             .cloned()
             .collect::<Vec<_>>();
 
-        assert!(vec![0 as u16, 1, 2].into_iter().eq(results.into_iter()));
+        assert!(vec![0_u16, 1, 2].into_iter().eq(results.into_iter()));
     }
 
     #[test]
@@ -1027,5 +1052,24 @@ mod tests {
         };
 
         assert_eq!(items, vec![&0])
+    }
+
+    #[test]
+    fn test_owned_impl_iter() {
+        #[expect(dead_code)]
+        struct TestTrie<T> {
+            map: GenericPatriciaMap<Vec<u8>, T>,
+        }
+
+        impl<T> TestTrie<T> {
+            #[expect(dead_code)]
+            fn common_prefix_test<'a>(
+                &'a self,
+                domain: &[u8],
+            ) -> impl Iterator<Item = &'a T> + use<'a, T> {
+                let domain = domain.to_vec();
+                self.map.common_prefix_values_owned(domain)
+            }
+        }
     }
 }

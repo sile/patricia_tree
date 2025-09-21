@@ -1,5 +1,5 @@
 //! A node which represents a subtree of a patricia tree.
-use crate::BorrowedBytes;
+use crate::{BorrowedBytes, Bytes};
 use alloc::alloc::{Layout, alloc, dealloc, handle_alloc_error};
 use alloc::vec::Vec;
 use core::marker::PhantomData;
@@ -443,6 +443,16 @@ impl<V> Node<V> {
         K: ?Sized + BorrowedBytes,
     {
         CommonPrefixesIter {
+            key,
+            stack: vec![(0, self)],
+        }
+    }
+
+    pub(crate) fn common_prefixes_owned<'a, K: Bytes>(
+        &'a self,
+        key: K,
+    ) -> CommonPrefixesIterOwned<'a, K, V> {
+        CommonPrefixesIterOwned {
             key,
             stack: vec![(0, self)],
         }
@@ -941,6 +951,41 @@ where
     }
 }
 
+/// An iterator over entries in that collects all values up to
+/// until the key stops matching.
+#[derive(Debug)]
+pub(crate) struct CommonPrefixesIterOwned<'a, K, V> {
+    key: K,
+    stack: Vec<(usize, &'a Node<V>)>,
+}
+
+impl<'a, K, V> Iterator for CommonPrefixesIterOwned<'a, K, V>
+where
+    K: Bytes + AsRef<K::Borrowed>,
+{
+    type Item = (usize, &'a Node<V>);
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some((offset, node)) = self.stack.pop() {
+            let key = self.key.as_ref().strip_n_prefix(offset);
+            let (_next, common_prefix_len) = key.strip_common_prefix_and_len(node.label());
+            if common_prefix_len == 0 && key.cmp_first_item(node.label()).is_ge() {
+                if let Some(sibling) = node.sibling() {
+                    self.stack.push((offset, sibling));
+                }
+            }
+
+            if common_prefix_len == node.label().len() {
+                let prefix_len = offset + common_prefix_len;
+                if let Some(child) = node.child() {
+                    self.stack.push((prefix_len, child));
+                }
+                return Some((prefix_len, node));
+            }
+        }
+        None
+    }
+}
+
 /// An owning iterator which traverses the nodes in a tree, in depth first order.
 ///
 /// The first element of an item is the level of the traversing node.
@@ -1058,7 +1103,7 @@ mod tests {
         let node = Node::new(&[b'a'; 256][..], Some(10), None, None);
         assert_eq!(node.label(), &[b'a'; 255][..]);
         assert_eq!(node.value(), None);
-        assert_eq!(node.child().is_some(), true);
+        assert!(node.child().is_some());
 
         let child = node.child().unwrap();
         assert_eq!(child.label(), b"a");
