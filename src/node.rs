@@ -448,10 +448,10 @@ impl<V> Node<V> {
         }
     }
 
-    pub(crate) fn common_prefixes_owned<'a, K: Bytes>(
-        &'a self,
+    pub(crate) fn common_prefixes_owned<K: Bytes>(
+        &self,
         key: K,
-    ) -> CommonPrefixesIterOwned<'a, K, V> {
+    ) -> CommonPrefixesIterOwned<'_, K, V> {
         CommonPrefixesIterOwned {
             key,
             stack: vec![(0, self)],
