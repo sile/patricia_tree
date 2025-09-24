@@ -96,10 +96,7 @@ impl<V> PatriciaTree<V> {
     {
         self.root.common_prefixes(key)
     }
-    pub(crate) fn common_prefixes_owned<K>(
-        &self,
-        key: K,
-    ) -> node::CommonPrefixesIterOwned<'_, K, V>
+    pub(crate) fn common_prefixes_owned<K>(&self, key: K) -> node::CommonPrefixesIterOwned<'_, K, V>
     where
         K: Bytes + AsRef<K::Borrowed>,
     {
