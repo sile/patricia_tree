@@ -1053,7 +1053,7 @@ mod tests {
 
         impl<T> TestTrie<T> {
             #[expect(dead_code)]
-            fn common_prefix_test(&self, domain: &[u8]) -> impl Iterator<Item = &'_ T> {
+            fn common_prefix_test(&self, domain: &[u8]) -> impl Iterator<Item = &T> {
                 let domain = domain.to_vec();
                 self.map.common_prefix_values_owned(domain)
             }
