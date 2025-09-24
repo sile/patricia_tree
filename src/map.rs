@@ -335,10 +335,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefix_values<'a, 'b, Q>(
-        &'a self,
-        key: &'b Q,
-    ) -> impl Iterator<Item = &'a V> + use<'a, 'b, Q, K, V>
+    pub fn common_prefix_values<'a, 'b, Q>(&'a self, key: &'b Q) -> impl Iterator<Item = &'a V>
     where
         Q: ?Sized + AsRef<K::Borrowed>,
         <K as Bytes>::Borrowed: 'b,
@@ -367,10 +364,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     ///     .flatten()
     ///     .eq(vec![&"a", &"b", &"c", &"d"].into_iter()));
     /// ```
-    pub fn common_prefix_values_owned(
-        &self,
-        key: K,
-    ) -> impl Iterator<Item = &V> + use<'_, K, V>
+    pub fn common_prefix_values_owned(&self, key: K) -> impl Iterator<Item = &V>
     where
         K: AsRef<K::Borrowed>,
     {
@@ -514,7 +508,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     pub fn iter_prefix<'a, 'b>(
         &'a self,
         prefix: &'b K::Borrowed,
-    ) -> impl Iterator<Item = (K, &'a V)> + use<'a, 'b, K, V> {
+    ) -> impl Iterator<Item = (K, &'a V)> {
         self.tree
             .iter_prefix(prefix)
             .into_iter()
@@ -538,7 +532,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     pub fn iter_prefix_mut<'a, 'b>(
         &'a mut self,
         prefix: &'b K::Borrowed,
-    ) -> impl Iterator<Item = (K, &'a mut V)> + use<'a, 'b, K, V> {
+    ) -> impl Iterator<Item = (K, &'a mut V)> {
         self.tree
             .iter_prefix_mut(prefix)
             .into_iter()
@@ -1062,10 +1056,7 @@ mod tests {
 
         impl<T> TestTrie<T> {
             #[expect(dead_code)]
-            fn common_prefix_test<'a>(
-                &'a self,
-                domain: &[u8],
-            ) -> impl Iterator<Item = &'a T> + use<'a, T> {
+            fn common_prefix_test(&self, domain: &[u8]) -> impl Iterator<Item = &'_ T> {
                 let domain = domain.to_vec();
                 self.map.common_prefix_values_owned(domain)
             }
