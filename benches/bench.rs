@@ -2,7 +2,6 @@ use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use patricia_tree::PatriciaSet;
 use rand::{Rng, seq::IndexedRandom};
 
-use core::hash;
 use std::{
     collections::{BTreeSet, HashSet},
     hint::black_box,
