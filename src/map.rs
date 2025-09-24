@@ -505,10 +505,7 @@ impl<K: Bytes, V> GenericPatriciaMap<K, V> {
     /// assert_eq!(vec![(Vec::from("bar"), &2), ("baz".into(), &3)],
     ///            map.iter_prefix(b"ba").collect::<Vec<_>>());
     /// ```
-    pub fn iter_prefix<'a>(
-        &'a self,
-        prefix: &K::Borrowed,
-    ) -> impl Iterator<Item = (K, &'a V)> {
+    pub fn iter_prefix<'a>(&'a self, prefix: &K::Borrowed) -> impl Iterator<Item = (K, &'a V)> {
         self.tree
             .iter_prefix(prefix)
             .into_iter()
