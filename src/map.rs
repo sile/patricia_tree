@@ -15,6 +15,11 @@ use core::marker::PhantomData;
 pub type PatriciaMap<V> = GenericPatriciaMap<Vec<u8>, V>;
 
 /// Patricia tree based map with [`String`] as key.
+///
+/// Keys are compared at character boundaries, and all prefix operations are
+/// aligned to character boundaries of the query key.  For example,
+/// `longest_common_prefix_len()` never returns a length that splits a
+/// multi-byte character.
 pub type StringPatriciaMap<V> = GenericPatriciaMap<String, V>;
 
 /// Patricia tree based map.

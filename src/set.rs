@@ -12,6 +12,9 @@ use core::iter::FromIterator;
 pub type PatriciaSet = GenericPatriciaSet<Vec<u8>>;
 
 /// Patricia tree based set with [`String`] as key.
+///
+/// Keys are compared at character boundaries, and all prefix operations are
+/// aligned to character boundaries of the query value.
 pub type StringPatriciaSet = GenericPatriciaSet<String>;
 
 /// Patricia tree based set.
