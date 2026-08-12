@@ -125,6 +125,12 @@ impl BorrowedBytes for [u8] {
     }
 }
 
+/// `str` keys are compared at character boundaries, and node labels are
+/// always split at character boundaries.  Thus a partial byte match that
+/// splits a multi-byte character (e.g., only the first byte of a 4-byte
+/// character) is not treated as a common prefix, and length-returning
+/// methods such as `GenericPatriciaMap::longest_common_prefix_len()` return
+/// values aligned to character boundaries of the query key.
 impl BorrowedBytes for str {
     fn as_bytes(&self) -> &[u8] {
         self.as_bytes()
