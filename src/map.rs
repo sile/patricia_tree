@@ -761,7 +761,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::seq::SliceRandom;
 
     #[test]
     fn it_works() {
@@ -841,7 +840,11 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn large_map_works() {
         let mut input = (0..10000).map(|i| (i.to_string(), i)).collect::<Vec<_>>();
-        input.shuffle(&mut rand::rng());
+        let mut ctx = noprop::TestCaseContext::new(0xDEAD_BEEF);
+        for i in (1..input.len()).rev() {
+            let j = noprop::sample_usize_in(&mut ctx, 0..=i);
+            input.swap(i, j);
+        }
 
         // Insert
         let mut map = input.iter().cloned().collect::<PatriciaMap<_>>();
