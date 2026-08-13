@@ -1,0 +1,86 @@
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: 'BENCH_REPEATS value passed to the benchmark example (best-of reported)'
+        default: '30'
+        type: string
+
+jobs:
+  bench:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install stable toolchain
+        run: |
+          rustup update stable
+          rustup default stable
+
+      - name: Environment info
+        run: |
+          echo "=== Runner ==="
+          echo "RUNNER_OS=$RUNNER_OS"
+          echo "RUNNER_ARCH=$RUNNER_ARCH"
+          uname -smr
+          echo
+          echo "=== rustc ==="
+          rustc --version
+          echo
+          echo "=== CPU ==="
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            lscpu
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            echo "brand: $(sysctl -n machdep.cpu.brand_string)"
+            echo "physical cores: $(sysctl -n hw.physicalcpu)"
+            echo "logical cores: $(sysctl -n hw.logicalcpu)"
+          fi
+          echo
+          echo "=== Memory ==="
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            free -h
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            mem_bytes=$(sysctl -n hw.memsize)
+            mem_gib=$(awk "BEGIN {printf \"%.1f\", $mem_bytes / 1024 / 1024 / 1024}")
+            echo "hw.memsize: $mem_bytes bytes (~${mem_gib} GiB)"
+          fi
+
+      - name: Run benchmark
+        # ubuntu-latest runners use a mix of CPU generations (Skylake /
+        # Cascade Lake / Ice Lake / Sapphire Rapids — different Azure VM
+        # SKUs). Performance can vary up to ~10-15% between generations,
+        # which can swamp small optimizations and look like uniform
+        # regressions/wins across unrelated cases. When aggregating
+        # multiple runs (e.g., A/B comparing two branches), grep the
+        # `cpu:` line from each artifact's bench.txt and group runs by
+        # CPU model before computing best-of-N. macos-latest runners are
+        # M1, so they're consistent and don't need this treatment.
+        env:
+          BENCH_REPEATS: ${{ inputs.repeats }}
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            cpu=$(lscpu | awk -F': +' '/^Model name/ {print $2; exit}')
+          else
+            cpu=$(sysctl -n machdep.cpu.brand_string)
+          fi
+          {
+            echo "cpu: $cpu"
+            echo "os: $RUNNER_OS $RUNNER_ARCH"
+            echo "rustc: $(rustc --version)"
+            echo
+            cargo run --release --example bench
+          } | tee bench.txt
+
+      - name: Upload results
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bench-${{ matrix.os }}
+          path: bench.txt
