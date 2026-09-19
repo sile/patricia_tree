@@ -26,7 +26,10 @@ fn sample_byte_prefix_of_existing(
     model: &BTreeMap<Vec<u8>, u32>,
 ) -> Vec<u8> {
     let index = noprop::sample_usize_in(ctx, 0..model.len());
-    let key = model.keys().nth(index).unwrap();
+    let key = model
+        .keys()
+        .nth(index)
+        .expect("index is sampled from 0..model.len()");
     let cut = noprop::sample_usize_in(ctx, 0..=key.len());
     key[..cut].to_vec()
 }
@@ -36,7 +39,10 @@ fn sample_string_prefix_of_existing(
     model: &BTreeMap<String, u32>,
 ) -> String {
     let index = noprop::sample_usize_in(ctx, 0..model.len());
-    let key = model.keys().nth(index).unwrap();
+    let key = model
+        .keys()
+        .nth(index)
+        .expect("index is sampled from 0..model.len()");
     let cut = noprop::sample_usize_in(ctx, 0..=key.chars().count());
     key.chars().take(cut).collect()
 }

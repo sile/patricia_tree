@@ -12,8 +12,9 @@ fn serde_works() {
     input.sort();
 
     let map: PatriciaMap<u32> = input.iter().cloned().collect();
-    let serialized = serde_json::to_vec(&map).unwrap();
-    let map: PatriciaMap<u32> = serde_json::from_slice(serialized.as_slice()).unwrap();
+    let serialized = serde_json::to_vec(&map).expect("a map must serialize to JSON");
+    let map: PatriciaMap<u32> =
+        serde_json::from_slice(serialized.as_slice()).expect("the JSON must deserialize to a map");
 
     assert_eq!(map.len(), 3);
     assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
@@ -27,8 +28,9 @@ fn large_serde_works() {
     input.sort();
 
     let map: PatriciaMap<u32> = input.iter().cloned().collect();
-    let serialized = serde_json::to_vec(&map).unwrap();
-    let map: PatriciaMap<u32> = serde_json::from_slice(serialized.as_slice()).unwrap();
+    let serialized = serde_json::to_vec(&map).expect("a map must serialize to JSON");
+    let map: PatriciaMap<u32> =
+        serde_json::from_slice(serialized.as_slice()).expect("the JSON must deserialize to a map");
 
     assert_eq!(map.len(), 10000);
     assert_eq!(map.into_iter().collect::<Vec<_>>(), input);
