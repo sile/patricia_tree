@@ -1,4 +1,19 @@
 //! A node which represents a subtree of a patricia tree.
+//!
+//! # Memory layout
+//!
+//! To cut per-`Node` overhead, a node stores all of its fields (flags, label,
+//! value, child and sibling) in a single allocation whose layout is computed
+//! at construction time, and reaches them through a raw `*mut u8` pointer.
+//! This is the reason this module needs `unsafe`: the standard library offers
+//! no safe abstraction that keeps the payload in one allocation. Every
+//! `unsafe` block here is confined to that raw-memory bookkeeping.
+#![expect(
+    unsafe_code,
+    reason = "the fields of a node are packed into one allocation to reduce per-node \
+              overhead; reaching them through a raw pointer requires pointer arithmetic \
+              and calls to the allocator"
+)]
 use crate::{BorrowedBytes, Bytes};
 use alloc::alloc::{Layout, alloc, dealloc, handle_alloc_error};
 use alloc::vec::Vec;

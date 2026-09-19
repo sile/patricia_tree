@@ -8,7 +8,7 @@ use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 impl<T> Serialize for GenericPatriciaSet<T> {
-    /// In order to serialize a [PatriciaSet], make sure you installed the crate
+    /// In order to serialize a [`PatriciaSet`](crate::set::PatriciaSet), make sure you installed the crate
     /// with the feature `serde`.
     ///
     /// For example, in your `Cargo.toml`:
@@ -27,7 +27,7 @@ impl<T> Serialize for GenericPatriciaSet<T> {
 }
 
 impl<K, V: Serialize> Serialize for GenericPatriciaMap<K, V> {
-    /// In order to serialize a [PatriciaMap], make sure you installed the crate
+    /// In order to serialize a [`PatriciaMap`](crate::map::PatriciaMap), make sure you installed the crate
     /// with the feature `serde`.
     ///
     /// For example, in your `Cargo.toml`:
@@ -75,7 +75,7 @@ impl<T: Serialize> Serialize for Node<T> {
 }
 
 impl<'de, T: crate::Bytes> Deserialize<'de> for GenericPatriciaSet<T> {
-    /// In order to deserialize a [PatriciaSet], make sure you installed the crate
+    /// In order to deserialize a [`PatriciaSet`](crate::set::PatriciaSet), make sure you installed the crate
     /// with the feature `serde`.
     ///
     /// For example, in your `Cargo.toml`:
@@ -95,7 +95,7 @@ impl<'de, T: crate::Bytes> Deserialize<'de> for GenericPatriciaSet<T> {
 }
 
 impl<'de, K: crate::Bytes, V: Deserialize<'de>> Deserialize<'de> for GenericPatriciaMap<K, V> {
-    /// In order to serialize a [PatriciaMap], make sure you installed the crate
+    /// In order to deserialize a [`PatriciaMap`](crate::map::PatriciaMap), make sure you installed the crate
     /// with the feature `serde`.
     ///
     /// For example, in your `Cargo.toml`:
