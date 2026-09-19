@@ -1057,7 +1057,8 @@ impl<V> Iterator for IntoIter<V> {
 mod tests {
     use super::*;
     use crate::{PatriciaSet, StringPatriciaMap};
-    use std::str;
+    use alloc::string::String;
+    use core::str;
 
     #[test]
     fn root_works() {
