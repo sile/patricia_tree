@@ -40,8 +40,22 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: rustup toolchain install 1.85.0 --profile minimal
-      - run: rustup default 1.85.0
+      # The MSRV is read from `Cargo.toml`'s `rust-version` so it is not
+      # duplicated here. `cargo metadata + jq` is preferred over
+      # `cargo pkgid | sed` so a future change to cargo's pkgid output
+      # format cannot silently break the extraction. `jq` is
+      # preinstalled on ubuntu-latest. Stable is installed first because
+      # `cargo metadata` needs a working toolchain to run.
+      - name: Read MSRV from Cargo.toml
+        run: |
+          set -euo pipefail
+          rustup update stable
+          rustup default stable
+          msrv="$(cargo metadata --format-version=1 --no-deps \
+            | jq -r '.packages[] | select(.name == "patricia_tree") | .rust_version')"
+          echo "MSRV=$msrv" >> "$GITHUB_ENV"
+      - run: rustup toolchain install "$MSRV" --profile minimal
+      - run: rustup default "$MSRV"
       - run: cargo check --all-features --all-targets
 
   lints:
