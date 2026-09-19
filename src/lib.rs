@@ -76,7 +76,7 @@ pub trait BorrowedBytes {
     /// Returns a suffix of this instance not containing the common prefix with the given bytes.
     fn strip_common_prefix(&self, bytes: &[u8]) -> &Self;
 
-    /// Same as [`strip_common_prefix()`], but also returns the length of the common prefix.
+    /// Same as [`strip_common_prefix()`](Self::strip_common_prefix), but also returns the length of the common prefix.
     fn strip_common_prefix_and_len(&self, bytes: &[u8]) -> (&Self, usize) {
         let next = self.strip_common_prefix(bytes);
         let common_prefix_len = self.as_bytes().len() - next.as_bytes().len();
