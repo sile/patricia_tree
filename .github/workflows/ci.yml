@@ -56,7 +56,11 @@ jobs:
           echo "MSRV=$msrv" >> "$GITHUB_ENV"
       - run: rustup toolchain install "$MSRV" --profile minimal
       - run: rustup default "$MSRV"
-      - run: cargo check --all-features --all-targets
+      # Check only the library, not `--all-targets`: dev-dependencies are
+      # irrelevant to downstream users and may themselves require a newer
+      # rustc, which would make this job fail for the wrong reason.
+      - run: cargo check --all-features
+      - run: cargo check --no-default-features
 
   lints:
     name: Lints
