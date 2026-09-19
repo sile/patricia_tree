@@ -518,11 +518,14 @@ fn string_key_split_mid_character() {
     assert_eq!(map.get(&key), Some(&1));
 
     // Force a split by inserting a sibling that shares the long prefix.
-    map.insert("b".to_string(), 2);
+    map.insert("b", 2);
     assert_eq!(map.len(), 2);
     assert_eq!(map.get(&key), Some(&1));
     assert_eq!(map.get("b"), Some(&2));
 
-    let entries = map.iter().map(|(k, v)| (k.to_string(), *v)).collect::<Vec<_>>();
+    let entries = map
+        .iter()
+        .map(|(k, v)| (k.to_string(), *v))
+        .collect::<Vec<_>>();
     assert_eq!(entries, vec![(key, 1), ("b".to_string(), 2)]);
 }

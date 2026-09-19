@@ -112,7 +112,13 @@ impl<V> PatriciaTree<V> {
     }
     pub fn split_by_prefix<K: ?Sized + BorrowedBytes>(&mut self, prefix: &K) -> Self {
         if let Some(splitted_root) = self.root.split_by_prefix(prefix, 0) {
-            let mut splitted_root = Node::new(prefix.as_bytes(), None, Some(splitted_root), None);
+            let mut splitted_root = Node::new_with_boundary(
+                prefix.as_bytes(),
+                None,
+                Some(splitted_root),
+                None,
+                K::floor_boundary,
+            );
             splitted_root.try_merge_with_child(1);
             let splitted = Self::from(Node::new(b"", None, Some(splitted_root), None));
             self.len -= splitted.len();

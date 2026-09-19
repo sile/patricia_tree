@@ -92,6 +92,18 @@ pub trait BorrowedBytes {
 
     /// Returns a suffix of this instance not containing the first `n` bytes.
     fn strip_n_prefix(&self, n: usize) -> &Self;
+
+    /// Returns the largest index not exceeding `n` at which `bytes` may be
+    /// split into two valid instances of this type.
+    ///
+    /// `bytes` is assumed to be a valid representation of this type (i.e.,
+    /// `Self::is_valid_bytes(bytes)` is `true`).  For byte-oriented types the
+    /// split point is just `n`, while for `str` it is rounded down to the
+    /// nearest character boundary.
+    fn floor_boundary(bytes: &[u8], n: usize) -> usize {
+        let _ = bytes;
+        n
+    }
 }
 
 impl BorrowedBytes for [u8] {
@@ -165,5 +177,13 @@ impl BorrowedBytes for str {
 
     fn strip_n_prefix(&self, n: usize) -> &Self {
         &self[n..]
+    }
+
+    fn floor_boundary(bytes: &[u8], n: usize) -> usize {
+        let n = n.min(bytes.len());
+        match core::str::from_utf8(&bytes[..n]) {
+            Ok(_) => n,
+            Err(e) => e.valid_up_to(),
+        }
     }
 }
