@@ -5,27 +5,77 @@ on:
     tags: ['v*']
 
 jobs:
-  github-release:
+  validate:
+    name: Validate release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup update stable
+      - run: rustup default stable
+      - run: rustup component add rustfmt clippy
+      # Guard against a `v*` tag whose name does not match Cargo.toml.
+      # Without this, a tag like `v0.1.2` pushed against a manifest
+      # still on `version = "0.1.1"` would silently publish 0.1.1 to
+      # crates.io while the GitHub Release advertised v0.1.2.
+      # `cargo metadata + jq` is preferred over `cargo pkgid | sed` so
+      # a future change to cargo's pkgid output format cannot silently
+      # break the check. `jq` is preinstalled on ubuntu-latest.
+      - name: Tag matches Cargo.toml version
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          cargo_version="$(cargo metadata --format-version=1 --no-deps \
+            | jq -r '.packages[] | select(.name == "patricia_tree") | .version')"
+          if [ "$tag_version" != "$cargo_version" ]; then
+            echo "tag version ($tag_version) does not match Cargo.toml version ($cargo_version)"
+            exit 1
+          fi
+      # The `validate` job re-runs the CI suite so a broken commit
+      # that somehow received a `v*` tag never publishes, even if the
+      # push-time CI on that commit failed or was skipped.
+      - run: cargo test --all-features --all
+      - run: cargo test --doc --all-features
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-features --all -- -D warnings
+      - run: cargo check --no-default-features --all
+      - run: cargo test --no-default-features --all
+      - run: cargo clippy --no-default-features --all -- -D warnings
+      - env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --all-features
+      # Packaging smoke test: exercises manifest metadata, include /
+      # exclude, readme path, and the verify pass in a clean copy.
+      - run: cargo publish --dry-run
 
-      - id: create-release
-        run: gh release create ${{ github.ref_name }} --title "${{ github.ref_name }}" --generate-notes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+  # publish first: crates.io publish is non-reversible (unpublish is
+  # restricted to 72 hours and only removes the version from the index,
+  # not from downstream Cargo.lock files), so make it the guarding step.
+  # If it fails, no orphan github-release with a version that does not
+  # exist on crates.io is left behind. A github-release failure after
+  # publish succeeds is recoverable by re-running `gh release create`
+  # against the existing tag.
   publish:
+    needs: validate
     runs-on: ubuntu-latest
     # environment: release  # Optional: for enhanced security
     permissions:
       id-token: write
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-    - uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
-      id: auth
-    - run: cargo publish
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+        id: auth
+      - run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: create-release
+        run: gh release create ${{ github.ref_name }} --title "${{ github.ref_name }}" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
