@@ -28,6 +28,11 @@ serde = ["dep:serde"]
 [package.metadata.docs.rs]
 all-features = true
 
+[[test]]
+name = "serde"
+path = "tests/serde.rs"
+required-features = ["serde"]
+
 [[example]]
 name = "insert_lines"
 path = "examples/insert_lines.rs"
