@@ -101,15 +101,34 @@ impl<V> Node<V> {
     }
 
     /// Makes a new node.
-    pub fn new(
+    pub fn new(label: &[u8], value: Option<V>, child: Option<Self>, sibling: Option<Self>) -> Self {
+        Self::new_with_boundary(label, value, child, sibling, |bytes| bytes.len())
+    }
+
+    /// Makes a new node, splitting an over-long `label` at a boundary chosen by
+    /// `floor_boundary` (see [`BorrowedBytes::floor_boundary()`]).
+    ///
+    /// When `label` is longer than `MAX_LABEL_LEN`, the first `MAX_LABEL_LEN`
+    /// bytes are passed to `floor_boundary`, which returns a split point not
+    /// exceeding that length and aligned to a valid boundary of the key type
+    /// (e.g., so that `str` labels never break a multi-byte character).
+    pub(crate) fn new_with_boundary(
         mut label: &[u8],
         mut value: Option<V>,
         mut child: Option<Self>,
         sibling: Option<Self>,
+        floor_boundary: fn(&[u8]) -> usize,
     ) -> Self {
         if label.len() > MAX_LABEL_LEN {
-            child = Some(Node::new(&label[MAX_LABEL_LEN..], value, child, None));
-            label = &label[..MAX_LABEL_LEN];
+            let split_at = floor_boundary(&label[..MAX_LABEL_LEN]);
+            child = Some(Self::new_with_boundary(
+                &label[split_at..],
+                value,
+                child,
+                None,
+                floor_boundary,
+            ));
+            label = &label[..split_at];
             value = None;
         }
 
@@ -600,7 +619,13 @@ impl<V> Node<V> {
         if common_prefix_len == prefix.as_bytes().len() {
             let value = self.take_value();
             let child = self.take_child();
-            let node = Node::new(&self.label()[common_prefix_len..], value, child, None);
+            let node = Node::new_with_boundary(
+                &self.label()[common_prefix_len..],
+                value,
+                child,
+                None,
+                K::floor_boundary,
+            );
             if let Some(sibling) = self.take_sibling() {
                 *self = sibling;
             }
@@ -653,7 +678,13 @@ impl<V> Node<V> {
                 ptr: self.ptr,
                 _value: PhantomData,
             };
-            let node = Node::new(key.as_bytes(), Some(value), None, Some(this));
+            let node = Node::new_with_boundary(
+                key.as_bytes(),
+                Some(value),
+                None,
+                Some(this),
+                K::floor_boundary,
+            );
             self.ptr = node.ptr;
             mem::forget(node);
             return None;
@@ -675,14 +706,26 @@ impl<V> Node<V> {
             if let Some(child) = self.child_mut() {
                 return child.insert(next, value);
             }
-            let child = Node::new(next.as_bytes(), Some(value), None, None);
+            let child = Node::new_with_boundary(
+                next.as_bytes(),
+                Some(value),
+                None,
+                None,
+                K::floor_boundary,
+            );
             self.set_child(child);
             None
         } else if common_prefix_len == 0 {
             if let Some(sibling) = self.sibling_mut() {
                 return sibling.insert(next, value);
             }
-            let sibling = Node::new(next.as_bytes(), Some(value), None, None);
+            let sibling = Node::new_with_boundary(
+                next.as_bytes(),
+                Some(value),
+                None,
+                None,
+                K::floor_boundary,
+            );
             self.set_sibling(sibling);
             None
         } else {
