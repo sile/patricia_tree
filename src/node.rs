@@ -102,25 +102,25 @@ impl<V> Node<V> {
 
     /// Makes a new node.
     pub fn new(label: &[u8], value: Option<V>, child: Option<Self>, sibling: Option<Self>) -> Self {
-        Self::new_with_boundary(label, value, child, sibling, |_, n| n)
+        Self::new_with_boundary(label, value, child, sibling, |bytes| bytes.len())
     }
 
     /// Makes a new node, splitting an over-long `label` at a boundary chosen by
     /// `floor_boundary` (see [`BorrowedBytes::floor_boundary()`]).
     ///
-    /// `label` is split at the largest index `<= MAX_LABEL_LEN` returned by
-    /// `floor_boundary(label, MAX_LABEL_LEN)` so that the two resulting labels
-    /// are valid representations of the key type (e.g., for `str` they never
-    /// break a multi-byte character).
+    /// When `label` is longer than `MAX_LABEL_LEN`, the first `MAX_LABEL_LEN`
+    /// bytes are passed to `floor_boundary`, which returns a split point not
+    /// exceeding that length and aligned to a valid boundary of the key type
+    /// (e.g., so that `str` labels never break a multi-byte character).
     pub(crate) fn new_with_boundary(
         mut label: &[u8],
         mut value: Option<V>,
         mut child: Option<Self>,
         sibling: Option<Self>,
-        floor_boundary: fn(&[u8], usize) -> usize,
+        floor_boundary: fn(&[u8]) -> usize,
     ) -> Self {
         if label.len() > MAX_LABEL_LEN {
-            let split_at = floor_boundary(label, MAX_LABEL_LEN).clamp(1, MAX_LABEL_LEN);
+            let split_at = floor_boundary(&label[..MAX_LABEL_LEN]);
             child = Some(Self::new_with_boundary(
                 &label[split_at..],
                 value,

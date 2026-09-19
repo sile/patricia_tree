@@ -93,16 +93,21 @@ pub trait BorrowedBytes {
     /// Returns a suffix of this instance not containing the first `n` bytes.
     fn strip_n_prefix(&self, n: usize) -> &Self;
 
-    /// Returns the largest index not exceeding `n` at which `bytes` may be
-    /// split into two valid instances of this type.
+    /// Returns the length of the longest prefix of `bytes` that ends on a valid
+    /// boundary for this type.
     ///
-    /// `bytes` is assumed to be a valid representation of this type (i.e.,
-    /// `Self::is_valid_bytes(bytes)` is `true`).  For byte-oriented types the
-    /// split point is just `n`, while for `str` it is rounded down to the
-    /// nearest character boundary.
-    fn floor_boundary(bytes: &[u8], n: usize) -> usize {
-        let _ = bytes;
-        n
+    /// This is used when a label has to be split into two parts: the returned
+    /// length is a valid split point, i.e. both `&bytes[..ret]` and
+    /// `&bytes[ret..]` remain valid instances of this type.
+    ///
+    /// `bytes` is assumed to be a valid, non-empty representation of this type
+    /// (i.e., `Self::is_valid_bytes(bytes)` is `true`), so the returned length is
+    /// always in `1..=bytes.len()`.  For byte-oriented types the whole slice is
+    /// valid, while for `str` the length is rounded down to the nearest
+    /// character boundary (a non-empty valid `str` always has at least one
+    /// complete character, so the result is at least `1`).
+    fn floor_boundary(bytes: &[u8]) -> usize {
+        bytes.len()
     }
 }
 
@@ -179,10 +184,9 @@ impl BorrowedBytes for str {
         &self[n..]
     }
 
-    fn floor_boundary(bytes: &[u8], n: usize) -> usize {
-        let n = n.min(bytes.len());
-        match core::str::from_utf8(&bytes[..n]) {
-            Ok(_) => n,
+    fn floor_boundary(bytes: &[u8]) -> usize {
+        match core::str::from_utf8(bytes) {
+            Ok(_) => bytes.len(),
             Err(e) => e.valid_up_to(),
         }
     }
